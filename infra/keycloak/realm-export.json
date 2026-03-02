@@ -1,0 +1,108 @@
+{
+  "id": "hr",
+  "realm": "hr",
+  "enabled": true,
+  "displayName": "HR Realm",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "sslRequired": "external",
+  "roles": {
+    "realm": [
+      {
+        "name": "HR_ADMIN",
+        "description": "HR administrators"
+      },
+      {
+        "name": "EMPLOYEE",
+        "description": "Standard employee role"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "hr-backend",
+      "name": "HR Backend API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "bearerOnly": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    },
+    {
+      "clientId": "hr-frontend",
+      "name": "HR Frontend",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "employee_id",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "employee_id",
+            "claim.name": "employee_id",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "multivalued": "false"
+          }
+        }
+      ],
+      "redirectUris": [
+        "http://localhost:4200/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200"
+      ]
+    },
+    {
+      "clientId": "hr-admin-client",
+      "name": "HR Admin Service Client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "hr-admin-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "profile",
+        "email"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "stacey.smith@company.local",
+      "enabled": true,
+      "firstName": "Stacey",
+      "lastName": "Smith",
+      "email": "stacey.smith@company.local",
+      "emailVerified": true,
+      "attributes": {
+        "employee_id": [
+          "HR-ADMIN-0001"
+        ]
+      },
+      "realmRoles": [
+        "HR_ADMIN"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "ChangeMe123!",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: hr-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/hrapp}
+    username: ${SPRING_DATASOURCE_USERNAME:hr}
+    password: ${SPRING_DATASOURCE_PASSWORD:hr}
+    driver-class-name: org.postgresql.Driver
+  cache:
+    type: redis
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://localhost:8080/realms/hr}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI:http://localhost:8080/realms/hr/protocol/openid-connect/certs}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+resilience4j:
+  retry:
+    instances:
+      keycloakAdminApi:
+        max-attempts: ${KEYCLOAK_ADMIN_RETRY_MAX_ATTEMPTS:3}
+        wait-duration: ${KEYCLOAK_ADMIN_RETRY_WAIT_DURATION:300ms}
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: ${KEYCLOAK_ADMIN_RETRY_BACKOFF_MULTIPLIER:2}
+        retry-exceptions:
+          - org.springframework.web.client.RestClientException
+          - java.lang.RuntimeException
+
+app:
+  cache:
+    employee-ttl-seconds: ${EMPLOYEE_CACHE_TTL_SECONDS:60}
+
+keycloak:
+  admin:
+    server-url: ${KEYCLOAK_ADMIN_SERVER_URL:http://localhost:8080}
+    realm: ${KEYCLOAK_ADMIN_REALM:hr}
+    client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:hr-admin-client}
+    client-secret: ${KEYCLOAK_ADMIN_CLIENT_SECRET:}
+    employee-role: ${KEYCLOAK_EMPLOYEE_ROLE:EMPLOYEE}
+    employee-domain: ${KEYCLOAK_EMPLOYEE_DOMAIN:company.local}
+    temporary-password: ${KEYCLOAK_EMPLOYEE_TEMP_PASSWORD:ChangeMe123!}
+    temporary-password-enabled: ${KEYCLOAK_EMPLOYEE_PASSWORD_TEMPORARY:true}
+
+server:
+  port: ${SERVER_PORT:8081}

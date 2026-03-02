@@ -1,0 +1,132 @@
+@import '@angular/material/prebuilt-themes/indigo-pink.css';
+@import './styles/design-system/tokens.css';
+@import './styles/design-system/typography.css';
+@import './styles/design-system/utilities.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+	min-height: 100%;
+}
+
+body {
+	margin: 0;
+	background: var(--color-bg);
+	color: var(--color-text);
+	font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.mat-mdc-form-field {
+	width: 100%;
+}
+
+.mat-mdc-form-field-subscript-wrapper {
+	min-height: 1.4rem;
+}
+
+.mat-mdc-text-field-wrapper {
+	background: var(--color-surface) !important;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+}
+
+.mat-mdc-form-field .mdc-floating-label,
+.mat-mdc-form-field .mat-mdc-form-field-hint,
+.mat-mdc-form-field .mat-mdc-input-element,
+.mat-mdc-form-field .mat-mdc-form-field-error {
+	color: var(--color-text) !important;
+}
+
+.mat-mdc-form-field .mat-mdc-form-field-error {
+	color: var(--color-danger) !important;
+}
+
+.mat-mdc-form-field.mat-focused .mat-mdc-text-field-wrapper {
+	border-color: var(--color-primary);
+	box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+.mat-mdc-raised-button.mat-primary,
+.mat-mdc-unelevated-button.mat-primary {
+	background-color: var(--color-primary) !important;
+	color: #ffffff !important;
+	font-weight: 600;
+	border: 1px solid color-mix(in srgb, var(--color-primary) 82%, #000000);
+	box-shadow: 0 1px 2px rgb(0 0 0 / 0.15);
+}
+
+.mat-mdc-raised-button.mat-primary:hover,
+.mat-mdc-unelevated-button.mat-primary:hover {
+	filter: brightness(0.93);
+}
+
+.mat-mdc-outlined-button {
+	border: 1px solid color-mix(in srgb, var(--color-text) 45%, var(--color-border)) !important;
+	color: var(--color-text) !important;
+	background: color-mix(in srgb, var(--color-surface) 92%, var(--color-text) 8%);
+	font-weight: 600;
+}
+
+.mat-mdc-outlined-button:hover {
+	background: color-mix(in srgb, var(--color-surface) 84%, var(--color-text) 16%);
+}
+
+.mat-mdc-button-base:focus-visible {
+	outline: 3px solid color-mix(in srgb, var(--color-primary) 38%, transparent);
+	outline-offset: 2px;
+}
+
+[data-theme='dark'] .mat-mdc-raised-button.mat-primary,
+[data-theme='dark'] .mat-mdc-unelevated-button.mat-primary {
+	color: #0b1220 !important;
+}
+
+.app-input,
+.app-textarea {
+	width: 100%;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-md);
+	background: var(--color-surface);
+	color: var(--color-text);
+	@apply px-3 py-2;
+}
+
+.app-input:focus,
+.app-textarea:focus {
+	outline: 2px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+	outline-offset: 1px;
+}
+
+.app-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.app-table th,
+.app-table td {
+	border-bottom: 1px solid var(--color-border);
+	@apply px-3 py-3 text-left text-sm;
+}
+
+.app-skeleton {
+	background: linear-gradient(
+		90deg,
+		color-mix(in srgb, var(--color-border) 70%, transparent) 0%,
+		color-mix(in srgb, var(--color-border) 45%, transparent) 50%,
+		color-mix(in srgb, var(--color-border) 70%, transparent) 100%
+	);
+	background-size: 200% 100%;
+	animation: app-skeleton 1.2s ease-in-out infinite;
+}
+
+@keyframes app-skeleton {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
+	}
+}

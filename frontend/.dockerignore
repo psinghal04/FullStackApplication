@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+cypress/screenshots
+cypress/videos
+.git
+.gitignore
+**/*.log
+.vscode
+.idea

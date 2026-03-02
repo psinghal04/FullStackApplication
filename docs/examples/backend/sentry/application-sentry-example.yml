@@ -1,0 +1,19 @@
+sentry:
+  dsn: https://<public-key>@o0.ingest.sentry.io/<project-id>
+  environment: dev
+  release: hr-backend@local
+  traces-sample-rate: 0.20
+  send-default-pii: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  tracing:
+    sampling:
+      probability: 1.0
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"

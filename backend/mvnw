@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Minimal Maven wrapper entrypoint for this skeleton.
+# If Maven Wrapper JAR is not present yet, install Maven and run:
+#   mvn wrapper:wrapper
+
+exec mvn "$@"
