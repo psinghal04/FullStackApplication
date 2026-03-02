@@ -13,8 +13,17 @@ import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.function.Predicate;
 import java.util.Set;
 
+/**
+ * Converts Keycloak JWTs into Spring Security authentication tokens.
+ *
+ * <p>This converter maps realm roles to {@code ROLE_*} authorities and builds a custom
+ * {@link EmployeeJwtPrincipal} containing both normalized employee identity and raw claims for
+ * downstream authorization and policy filters.</p>
+ */
 @Component
 public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
@@ -24,6 +33,9 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
         this.employeeRepository = employeeRepository;
     }
 
+    /**
+     * Creates an authenticated principal + authorities from a validated JWT.
+     */
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
         Set<GrantedAuthority> authorities = new HashSet<>();
@@ -35,24 +47,17 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
     }
 
     private String resolveEmployeeId(Jwt jwt) {
-        String employeeId = jwt.getClaimAsString("employee_id");
-        if (employeeId != null && !employeeId.isBlank()) {
-            return employeeId;
-        }
-
-        String preferredUsername = jwt.getClaimAsString("preferred_username");
-        String usernameDerived = deriveEmployeeIdFromUsername(preferredUsername);
-        if (usernameDerived != null) {
-            return usernameDerived;
-        }
-
-        String email = jwt.getClaimAsString("email");
-        if (email == null || email.isBlank()) {
-            return null;
-        }
-
-        return employeeRepository.findByEmailAddressIgnoreCase(email.trim())
-            .map(employee -> employee.getEmployeeId())
+        // Preferred source: explicit employee_id claim.
+        return Optional.ofNullable(jwt.getClaimAsString("employee_id"))
+            .filter(Predicate.not(String::isBlank))
+            // Compatibility fallback: derive from username prefix if it looks like EMP-xxxx.
+            .or(() -> Optional.ofNullable(deriveEmployeeIdFromUsername(jwt.getClaimAsString("preferred_username"))))
+            // Final fallback for legacy principals: map email to employee record.
+            .or(() -> Optional.ofNullable(jwt.getClaimAsString("email"))
+                .map(String::trim)
+                .filter(Predicate.not(String::isBlank))
+                .flatMap(employeeRepository::findByEmailAddressIgnoreCase)
+                .map(employee -> employee.getEmployeeId()))
             .orElse(null);
     }
 
@@ -99,9 +104,11 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
     }
 
     private String toRoleAuthority(String role) {
-        if (role.startsWith("ROLE_")) {
-            return role;
-        }
-        return "ROLE_" + role;
+        String roleFormat = role.startsWith("ROLE_") ? "prefixed" : "plain";
+        return switch (roleFormat) {
+            case "prefixed" -> role;
+            case "plain" -> "ROLE_" + role;
+            default -> throw new IllegalStateException("Unexpected role format: " + roleFormat);
+        };
     }
 }

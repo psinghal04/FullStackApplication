@@ -116,13 +116,16 @@ class TerminatedEmployeeFilterTest {
         }
 
         private static KeycloakAdminProperties defaultProperties() {
-            KeycloakAdminProperties properties = new KeycloakAdminProperties();
-            properties.setServerUrl("http://localhost");
-            properties.setRealm("test-realm");
-            properties.setClientId("test-client");
-            properties.setClientSecret("test-secret");
-            properties.setEmployeeDomain("example.com");
-            return properties;
+            return new KeycloakAdminProperties(
+                "http://localhost",
+                "test-realm",
+                "test-client",
+                "test-secret",
+                "EMPLOYEE",
+                "example.com",
+                null,
+                false
+            );
         }
     }
 }

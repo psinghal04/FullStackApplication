@@ -15,10 +15,19 @@ import org.springframework.data.redis.serializer.RedisSerializationContext;
 
 import java.time.Duration;
 
+/**
+ * Redis cache configuration for application-level read caching.
+ */
 @Configuration
 @EnableCaching
 public class CacheConfig {
 
+    /**
+     * Configures Redis cache manager with JSON value serialization and TTL.
+     *
+     * <p>Default typing is enabled on a copy of the application object mapper to preserve
+     * polymorphic DTO types when values are deserialized from Redis.</p>
+     */
     @Bean
     public RedisCacheManager redisCacheManager(
         RedisConnectionFactory redisConnectionFactory,
@@ -28,7 +37,7 @@ public class CacheConfig {
         ObjectMapper cacheObjectMapper = objectMapper.copy();
         cacheObjectMapper.activateDefaultTyping(
             LaissezFaireSubTypeValidator.instance,
-            ObjectMapper.DefaultTyping.NON_FINAL,
+            ObjectMapper.DefaultTyping.EVERYTHING,
             JsonTypeInfo.As.PROPERTY
         );
 

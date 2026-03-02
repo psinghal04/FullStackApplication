@@ -13,6 +13,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
+/**
+ * Assigns and propagates a request correlation identifier.
+ *
+ * <p>The filter ensures every request has an {@code X-Correlation-Id}, mirrors it back in the
+ * response, and exposes it through MDC so log lines across layers can be stitched together.</p>
+ */
 @Component
 public class CorrelationIdFilter extends OncePerRequestFilter {
 

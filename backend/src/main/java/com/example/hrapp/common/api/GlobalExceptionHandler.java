@@ -1,9 +1,6 @@
 package com.example.hrapp.common.api;
 
-import com.example.hrapp.common.exception.AccessDeniedException;
-import com.example.hrapp.common.exception.BadRequestException;
-import com.example.hrapp.common.exception.KeycloakProvisioningException;
-import com.example.hrapp.common.exception.ResourceNotFoundException;
+import com.example.hrapp.common.exception.HrAppException;
 import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,21 +13,22 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import java.time.OffsetDateTime;
 import java.util.stream.Collectors;
 
+/**
+ * Centralized REST exception translation.
+ *
+ * <p>This keeps controllers focused on domain workflows while enforcing a consistent error
+ * response contract for clients.</p>
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ResourceNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleNotFound(ResourceNotFoundException exception) {
-        return build(HttpStatus.NOT_FOUND, exception.getMessage());
+    @ExceptionHandler(HrAppException.class)
+    public ResponseEntity<ApiErrorResponse> handleHrAppException(HrAppException exception) {
+        return build(exception.httpStatus(), exception.getMessage());
     }
 
-    @ExceptionHandler(AccessDeniedException.class)
-    public ResponseEntity<ApiErrorResponse> handleAccessDenied(AccessDeniedException exception) {
-        return build(HttpStatus.FORBIDDEN, exception.getMessage());
-    }
-
-    @ExceptionHandler({BadRequestException.class, HttpMessageNotReadableException.class})
-    public ResponseEntity<ApiErrorResponse> handleBadRequest(Exception exception) {
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ApiErrorResponse> handleBadRequest(HttpMessageNotReadableException exception) {
         return build(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
@@ -47,11 +45,6 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ApiErrorResponse> handleConstraintViolation(ConstraintViolationException exception) {
         return build(HttpStatus.BAD_REQUEST, exception.getMessage());
-    }
-
-    @ExceptionHandler(KeycloakProvisioningException.class)
-    public ResponseEntity<ApiErrorResponse> handleProvisioningFailure(KeycloakProvisioningException exception) {
-        return build(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

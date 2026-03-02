@@ -47,40 +47,65 @@ class EmployeeControllerTest {
         EmployeeService service = new EmployeeService(null, null, null) {
             @Override
             public EmployeeSummaryDTO create(EmployeeCreateDTO request) {
-                EmployeeSummaryDTO dto = new EmployeeSummaryDTO();
-                dto.setEmployeeId("EMP-000123");
-                dto.setFirstName(request.getFirstName());
-                dto.setLastName(request.getLastName());
-                dto.setJobTitle(request.getJobTitle());
-                dto.setEmailAddress(request.getEmailAddress());
-                return dto;
+                return new EmployeeSummaryDTO(
+                    null,
+                    "EMP-000123",
+                    request.firstName(),
+                    request.lastName(),
+                    request.jobTitle(),
+                    request.emailAddress(),
+                    null,
+                    null
+                );
             }
 
             @Override
             public EmployeeDetailsDTO getDetailsByEmployeeId(String employeeId) {
-                EmployeeDetailsDTO dto = new EmployeeDetailsDTO();
-                dto.setEmployeeId(employeeId);
-                dto.setFirstName("Jane");
-                dto.setLastName("Smith");
-                return dto;
+                return new EmployeeDetailsDTO(
+                    null,
+                    employeeId,
+                    "Jane",
+                    "Smith",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                );
             }
 
             @Override
             public EmployeeSummaryDTO patchContactByEmployeeId(String employeeId, EmployeeContactUpdateDTO request) {
-                EmployeeSummaryDTO dto = new EmployeeSummaryDTO();
-                dto.setEmployeeId(employeeId);
-                dto.setEmailAddress(request.getEmailAddress());
-                return dto;
+                return new EmployeeSummaryDTO(
+                    null,
+                    employeeId,
+                    null,
+                    null,
+                    null,
+                    request.emailAddress(),
+                    null,
+                    null
+                );
             }
         };
 
         EmployeeController controller = new EmployeeController(service);
-        KeycloakAdminProperties keycloakAdminProperties = new KeycloakAdminProperties();
-        keycloakAdminProperties.setServerUrl("http://localhost");
-        keycloakAdminProperties.setRealm("test-realm");
-        keycloakAdminProperties.setClientId("test-client");
-        keycloakAdminProperties.setClientSecret("test-secret");
-        keycloakAdminProperties.setEmployeeDomain("example.com");
+        KeycloakAdminProperties keycloakAdminProperties = new KeycloakAdminProperties(
+            "http://localhost",
+            "test-realm",
+            "test-client",
+            "test-secret",
+            "EMPLOYEE",
+            "example.com",
+            null,
+            false
+        );
 
         KeycloakAdminClient keycloakAdminClient = new KeycloakAdminClient(keycloakAdminProperties) {
             @Override
@@ -105,17 +130,19 @@ class EmployeeControllerTest {
         setAuthenticatedPrincipal("HR-ADMIN-0001", "ROLE_HR_ADMIN");
         Mockito.when(employeeRepository.findByEmployeeId("HR-ADMIN-0001")).thenReturn(Optional.empty());
 
-        EmployeeCreateDTO request = new EmployeeCreateDTO();
-        request.setFirstName("John");
-        request.setLastName("Doe");
-        request.setJobTitle("Engineer");
-        request.setDateOfBirth(LocalDate.of(1990, 1, 1));
-        request.setGender("Male");
-        request.setDateOfHire(LocalDate.of(2024, 1, 1));
-        request.setHomeAddress("{}");
-        request.setMailingAddress("{}");
-        request.setTelephoneNumber("+1-555-0100");
-        request.setEmailAddress("john.doe@example.com");
+        EmployeeCreateDTO request = new EmployeeCreateDTO(
+            "John",
+            "Doe",
+            "Engineer",
+            LocalDate.of(1990, 1, 1),
+            "Male",
+            LocalDate.of(2024, 1, 1),
+            null,
+            "{}",
+            "{}",
+            "+1-555-0100",
+            "john.doe@example.com"
+        );
 
         mockMvc.perform(post("/api/v1/employees")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -139,11 +166,12 @@ class EmployeeControllerTest {
         setAuthenticatedPrincipal("EMP-000123", "ROLE_EMPLOYEE");
         Mockito.when(employeeRepository.findByEmployeeId("EMP-000123")).thenReturn(Optional.empty());
 
-        EmployeeContactUpdateDTO request = new EmployeeContactUpdateDTO();
-        request.setHomeAddress("new-home");
-        request.setMailingAddress("new-mail");
-        request.setTelephoneNumber("+1-555-1111");
-        request.setEmailAddress("new.email@example.com");
+        EmployeeContactUpdateDTO request = new EmployeeContactUpdateDTO(
+            "new-home",
+            "new-mail",
+            "+1-555-1111",
+            "new.email@example.com"
+        );
 
         mockMvc.perform(patch("/api/v1/employees/EMP-000123/contact")
                 .contentType(MediaType.APPLICATION_JSON)

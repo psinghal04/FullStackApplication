@@ -40,27 +40,16 @@ When HR calls `POST /api/v1/employees`:
 
 ## Search behavior
 
-`GET /api/v1/employees/search` supports `employeeId` and `lastName`:
+Canonical API behavior and precedence rules:
 
-- At least one of `employeeId` or `lastName` must be provided.
-- If `employeeId` is present, it takes precedence.
-- `employeeId` search is exact and case-insensitive.
-- `lastName` search is partial and case-insensitive.
+- [Search employees (paginated)](../docs/architecture.md#search-employees-paginated)
 
 ## Termination enforcement
 
-- `TerminatedEmployeeFilter` blocks authenticated terminated employees (`dateOfTermination <= today`) with HTTP 403.
-- Response payload:
+Canonical lifecycle/security flow details:
 
-```json
-{
-  "status": 403,
-  "message": "Employee terminated",
-  "reason": "terminated"
-}
-```
-
-- On blocked requests, backend also attempts to disable the matching Keycloak user via email claim (`setUserEnabledByEmail(email, false)`).
+- [Termination handling](../docs/architecture.md#termination-handling)
+- [How backend verifies roles and checks termination](../docs/security.md#5-how-backend-verifies-roles-and-checks-termination)
 
 ## Keycloak config via env vars
 
@@ -72,6 +61,12 @@ When HR calls `POST /api/v1/employees`:
 - `KEYCLOAK_EMPLOYEE_DOMAIN`
 - `KEYCLOAK_EMPLOYEE_TEMP_PASSWORD`
 - `KEYCLOAK_EMPLOYEE_PASSWORD_TEMPORARY`
+
+## Java modernization checklist (Java 17)
+
+Canonical checklist lives in the root docs:
+
+- [Java modernization checklist](../README.md#java-modernization-checklist-java-17)
 
 ## Example Keycloak upsert payload
 

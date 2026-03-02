@@ -28,6 +28,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * REST API surface for employee operations.
+ *
+ * <p>Authorization is primarily declarative via {@code @PreAuthorize}. Business rules such as
+ * immutable email and search precedence are delegated to the service layer.</p>
+ */
 @RestController
 @Validated
 @RequestMapping("/api/v1/employees")
@@ -39,6 +45,9 @@ public class EmployeeController {
         this.employeeService = employeeService;
     }
 
+    /**
+     * Creates a new employee and triggers identity provisioning.
+     */
     @PostMapping
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<EmployeeSummaryDTO> createEmployee(
@@ -48,6 +57,9 @@ public class EmployeeController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
+    /**
+     * Returns an employee profile for HR admins or the owning employee.
+     */
     @GetMapping("/{employeeId}")
     @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
     public ResponseEntity<EmployeeDetailsDTO> getEmployeeByPathEmployeeId(
@@ -56,6 +68,9 @@ public class EmployeeController {
         return ResponseEntity.ok(employeeService.getDetailsByEmployeeId(employeeId));
     }
 
+    /**
+     * Convenience endpoint to resolve the caller's own profile.
+     */
     @GetMapping("/me")
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<EmployeeDetailsDTO> getMyEmployeeProfile(Authentication authentication) {
@@ -64,7 +79,7 @@ public class EmployeeController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        String employeeId = employeePrincipal.getEmployee_id();
+        String employeeId = employeePrincipal.employee_id();
         if (employeeId == null || employeeId.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
@@ -72,6 +87,9 @@ public class EmployeeController {
         return ResponseEntity.ok(employeeService.getDetailsByEmployeeId(employeeId));
     }
 
+    /**
+     * Full update endpoint for HR admins.
+     */
     @PutMapping("/{employeeId}")
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<EmployeeSummaryDTO> updateEmployee(
@@ -81,6 +99,9 @@ public class EmployeeController {
         return ResponseEntity.ok(employeeService.updateByEmployeeId(employeeId, request));
     }
 
+    /**
+     * Partial contact update endpoint for HR admins and owning employees.
+     */
     @PatchMapping("/{employeeId}/contact")
     @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
     public ResponseEntity<EmployeeSummaryDTO> updateEmployeeContact(
@@ -90,6 +111,11 @@ public class EmployeeController {
         return ResponseEntity.ok(employeeService.patchContactByEmployeeId(employeeId, request));
     }
 
+    /**
+     * Searches employees by employeeId or lastName.
+     *
+     * <p>If both parameters are supplied, {@code employeeId} takes precedence.</p>
+     */
     @GetMapping("/search")
     @PreAuthorize("hasRole('HR_ADMIN')")
     public ResponseEntity<Page<EmployeeSummaryDTO>> searchEmployees(

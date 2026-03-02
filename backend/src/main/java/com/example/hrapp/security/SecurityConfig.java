@@ -10,11 +10,21 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
+/**
+ * Central Spring Security configuration for the resource server.
+ *
+ * <p>The API relies on bearer JWT validation plus method-level authorization. In addition,
+ * {@link TerminatedEmployeeFilter} is inserted after bearer authentication so it can enforce
+ * employee lifecycle constraints using the resolved authenticated principal.</p>
+ */
 @Configuration
 @EnableMethodSecurity
 @EnableConfigurationProperties(KeycloakAdminProperties.class)
 public class SecurityConfig {
 
+    /**
+     * Builds the HTTP security filter chain.
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(
         HttpSecurity http,

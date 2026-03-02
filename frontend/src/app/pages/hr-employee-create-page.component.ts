@@ -6,6 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { Router } from '@angular/router';
 import { EmployeeApiService } from '../api/employee-api.service';
 import { ApiError, EmployeeCreateRequest } from '../api/employee.models';
@@ -18,6 +19,7 @@ import { ApiError, EmployeeCreateRequest } from '../api/employee.models';
     ReactiveFormsModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
     MatButtonModule,
     MatIconModule,
     MatProgressSpinnerModule
@@ -48,7 +50,11 @@ import { ApiError, EmployeeCreateRequest } from '../api/employee.models';
 
           <mat-form-field appearance="fill" subscriptSizing="dynamic">
             <mat-label>Gender</mat-label>
-            <input matInput type="text" formControlName="gender" />
+            <mat-select formControlName="gender">
+              @for (option of genderOptions; track option) {
+                <mat-option [value]="option">{{ option }}</mat-option>
+              }
+            </mat-select>
             @if (isInvalid('gender')) { <mat-error>Gender is required.</mat-error> }
           </mat-form-field>
 
@@ -123,6 +129,8 @@ export class HrEmployeeCreatePageComponent {
   private readonly api = inject(EmployeeApiService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly router = inject(Router);
+
+  readonly genderOptions = ['Male', 'Female', 'Unspecified'] as const;
 
   readonly form = this.formBuilder.nonNullable.group({
     firstName: ['', [Validators.required]],

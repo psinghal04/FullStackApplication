@@ -20,6 +20,12 @@ import java.time.LocalDate;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
 
+/**
+ * Application service containing core employee business rules.
+ *
+ * <p>This layer owns lifecycle decisions (identity provisioning, immutable fields, termination
+ * interpretation, and search semantics) and keeps controllers thin.</p>
+ */
 @Service
 public class EmployeeService {
 
@@ -37,6 +43,9 @@ public class EmployeeService {
         this.keycloakAdminClient = keycloakAdminClient;
     }
 
+    /**
+     * Creates a new employee, provisions/updates identity, and aligns Keycloak enabled state.
+     */
     @Transactional
     @CacheEvict(cacheNames = "employeeSearch", allEntries = true)
     public EmployeeSummaryDTO create(EmployeeCreateDTO request) {
@@ -52,6 +61,7 @@ public class EmployeeService {
             saved.getFirstName(),
             saved.getLastName()
         );
+        // Enforce lifecycle consistency between HR data and IAM account state.
         keycloakAdminClient.setUserEnabledByEmail(saved.getEmailAddress(), !isTerminated(saved));
         return employeeMapper.toSummaryDTO(saved);
     }
@@ -63,6 +73,9 @@ public class EmployeeService {
         return employeeMapper.toDetailsDTO(employee);
     }
 
+    /**
+     * Fully updates an employee and reapplies identity lifecycle synchronization.
+     */
     @Transactional
     @Caching(evict = {
         @CacheEvict(cacheNames = "employeeDetails", key = "#employeeId"),
@@ -71,8 +84,8 @@ public class EmployeeService {
     })
     public EmployeeSummaryDTO updateByEmployeeId(String employeeId, EmployeeUpdateDTO request) {
         Employee employee = findByEmployeeIdOrThrow(employeeId);
-        ensureEmployeeIdIsUnique(request.getEmployeeId(), employee.getId());
-        ensureEmailAddressIsUnchanged(request.getEmailAddress(), employee.getEmailAddress());
+        ensureEmployeeIdIsUnique(request.employeeId(), employee.getId());
+        ensureEmailAddressIsUnchanged(request.emailAddress(), employee.getEmailAddress());
 
         employeeMapper.updateEntity(request, employee);
         Employee saved = employeeRepository.save(employee);
@@ -80,6 +93,9 @@ public class EmployeeService {
         return employeeMapper.toSummaryDTO(saved);
     }
 
+    /**
+     * Partially updates contact fields only.
+     */
     @Transactional
     @Caching(evict = {
         @CacheEvict(cacheNames = "employeeDetails", key = "#employeeId"),
@@ -110,6 +126,7 @@ public class EmployeeService {
         }
 
         if (normalizedEmployeeId != null) {
+            // Employee ID is authoritative and should not be diluted by fuzzy matching.
             return employeeRepository.findByEmployeeIdIgnoreCase(normalizedEmployeeId, pageable)
                 .map(employeeMapper::toSummaryDTO);
         }
@@ -155,12 +172,13 @@ public class EmployeeService {
     }
 
     private void ensureEmailAddressNotProvidedInContactPatch(EmployeeContactUpdateDTO request) {
-        if (request.getEmailAddress() != null) {
+        if (request.emailAddress() != null) {
             throw new BadRequestException("emailAddress cannot be changed once created");
         }
     }
 
     private String generateEmployeeId() {
+        // Random bounded retries balance uniqueness with predictable latency.
         for (int attempts = 0; attempts < 20; attempts++) {
             int value = ThreadLocalRandom.current().nextInt(1, 1_000_000);
             String candidate = "EMP-" + String.format("%06d", value);

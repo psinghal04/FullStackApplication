@@ -5,13 +5,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
 import { EmployeeApiService } from '../api/employee-api.service';
 import { ApiError, EmployeeDetails, EmployeeSummary, EmployeeUpdateRequest } from '../api/employee.models';
 
 @Component({
   selector: 'app-employee-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule],
   template: `
     <form [formGroup]="form" (ngSubmit)="submit()" class="ui-card grid gap-4">
       <div class="grid gap-3 md:grid-cols-2">
@@ -47,7 +48,11 @@ import { ApiError, EmployeeDetails, EmployeeSummary, EmployeeUpdateRequest } fro
 
         <mat-form-field appearance="fill" subscriptSizing="dynamic">
           <mat-label>Gender</mat-label>
-          <input matInput type="text" formControlName="gender" />
+          <mat-select formControlName="gender">
+            @for (option of genderOptions; track option) {
+              <mat-option [value]="option">{{ option }}</mat-option>
+            }
+          </mat-select>
           @if (isInvalid('gender')) { <mat-error>Gender is required.</mat-error> }
         </mat-form-field>
 
@@ -109,6 +114,8 @@ import { ApiError, EmployeeDetails, EmployeeSummary, EmployeeUpdateRequest } fro
 export class EmployeeFormComponent {
   private readonly formBuilder = inject(FormBuilder);
   private readonly api = inject(EmployeeApiService);
+
+  readonly genderOptions = ['Male', 'Female', 'Unspecified'] as const;
 
   @Input({ required: true }) employeeId!: string;
 

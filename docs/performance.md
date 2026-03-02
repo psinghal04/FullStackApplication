@@ -33,7 +33,7 @@ Recommended decision rule:
 - [x] Convert HR routes into lazy-loaded feature routes/modules.
 - [x] Keep login/public route in primary bundle; defer HR admin and profile-heavy views.
 - [x] Add preloading strategy only for likely next routes after login.
-- [ ] Verify production network waterfall and chunk split in CI artifact checks.
+- [ ] Verify production network waterfall and chunk split using local production builds.
 
 Implementation notes:
 
@@ -61,8 +61,8 @@ Guardrails:
 
 - [x] Define Angular bundle budget for `initial` bundle in Angular build config.
 - [ ] Add additional budgets (`anyComponentStyle`, lazy chunks) if needed.
-- [ ] Fail CI on budget overrun for production builds.
-- [ ] Run Lighthouse in CI (or scheduled) for key routes: login, HR search, employee profile.
+- [ ] Fail local production build on budget overrun.
+- [ ] Run Lighthouse manually (or on a team schedule) for key routes: login, HR search, employee profile.
 - [ ] Track and document thresholds for `LCP`, `CLS`, `INP`, and total JS bytes.
 
 Suggested initial targets:
@@ -112,7 +112,7 @@ onFCP(emit);
 
 - [ ] Baseline current metrics (Lighthouse + web-vitals dev capture).
 - [x] Implement lazy loading first (lowest risk, high impact).
-- [ ] Add bundle budgets and CI enforcement.
+- [ ] Add bundle budgets and local enforcement.
 - [ ] Add RUM instrumentation in production.
 - [ ] Evaluate SSR based on measured gap after above optimizations.
 - [ ] Add critical CSS only if login first paint remains a bottleneck.

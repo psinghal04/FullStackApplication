@@ -3,6 +3,12 @@ package com.example.hrapp.employee;
 import com.example.hrapp.common.exception.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
+/**
+ * Imperative access checks used by non-annotation-driven call paths.
+ *
+ * <p>Most endpoint authorization is declarative via Spring Security expressions; this policy
+ * remains useful for explicit checks in service/utility flows when needed.</p>
+ */
 @Component
 public class EmployeeAccessPolicy {
 

@@ -47,6 +47,8 @@ The application uses two primary realm roles:
 ### Cross-cutting business rules
 
 - `emailAddress` is immutable after employee creation.
+- For newly added employees, Keycloak `username` is set to the employee `emailAddress`.
+- New employee accounts are initialized with default password `ChangeMe123!`, which users can change on first login.
 - Terminated employees are blocked from API access with `403` + `reason: terminated`.
 - On terminated requests, backend attempts to disable the corresponding Keycloak account.
 
@@ -67,6 +69,14 @@ The application uses two primary realm roles:
 - Transactional create flow with Keycloak provisioning and retry/fallback handling.
 - Termination enforcement via dedicated security filter.
 - Correlation ID filter (`X-Correlation-Id`) for traceability.
+
+### Java modernization checklist (Java 17)
+
+- Prefer `record` for immutable DTOs and configuration models.
+- Use sealed exception hierarchies for closed, type-safe error modeling.
+- Use switch expressions (Java 17-safe forms) for small mapping logic.
+- Favor `Optional`/`ifPresentOrElse` to flatten null-heavy control flow.
+- Keep behavior-preserving refactors small and verify with focused tests first.
 
 ### Identity Layer (Keycloak)
 
@@ -123,13 +133,21 @@ curl http://localhost:8081/actuator/health
 curl http://localhost:8080/realms/hr/.well-known/openid-configuration
 ```
 
-3. Open the application:
+3. Seed Keycloak admin mappings (required for backend employee provisioning):
+
+```bash
+cd infra
+./scripts/seed-hr-admin.sh
+cd ..
+```
+
+4. Open the application:
 
 - Frontend: `http://localhost:4200`
 - Backend API: `http://localhost:8081`
 - Keycloak: `http://localhost:8080`
 
-4. Default seeded user (from realm import):
+5. Default seeded user (from realm import):
 
 - Username: `stacey.smith@company.local`
 - Password: `ChangeMe123!`
@@ -152,6 +170,6 @@ docker compose -f infra/docker-compose.yml down -v
 ## Documentation
 
 - Architecture: `docs/architecture.md`
-- Security: `docs/security.md`
+- Security: `docs/security.md` (employee credential bootstrap: `docs/security.md#employee-credential-bootstrap`)
 - Performance: `docs/performance.md`
 - Optional reference snippets: `docs/examples/README.md`

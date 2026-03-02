@@ -19,6 +19,13 @@ import java.io.IOException;
 import java.time.LocalDate;
 import java.util.Map;
 
+/**
+ * Enforces employee lifecycle policy after authentication.
+ *
+ * <p>If an authenticated employee is terminated ({@code dateOfTermination <= today}), the request
+ * is denied with a consistent 403 payload. As a remediation/synchronization step, the filter also
+ * attempts to disable the corresponding Keycloak user when an email claim is available.</p>
+ */
 @Component
 public class TerminatedEmployeeFilter extends OncePerRequestFilter {
 
@@ -54,7 +61,7 @@ public class TerminatedEmployeeFilter extends OncePerRequestFilter {
             return;
         }
 
-        String employeeId = principal.getEmployee_id();
+        String employeeId = principal.employee_id();
         if (employeeId == null || employeeId.isBlank()) {
             filterChain.doFilter(request, response);
             return;
@@ -66,10 +73,11 @@ public class TerminatedEmployeeFilter extends OncePerRequestFilter {
             .orElse(false);
 
         if (terminated) {
-            String email = principal.getClaims().get("email") instanceof String claimEmail
+            String email = principal.claims().get("email") instanceof String claimEmail
                 ? claimEmail
                 : null;
 
+            // Best-effort IAM state synchronization for already-terminated accounts.
             if (email != null && !email.isBlank()) {
                 keycloakAdminClient.setUserEnabledByEmail(email, false);
             }

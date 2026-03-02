@@ -164,7 +164,12 @@ Current backend enforcement path:
    - `backend/src/main/java/com/example/hrapp/security/SecurityConfig.java`
    - Adds `TerminatedEmployeeFilter` after bearer token authentication.
 
-## 6) Action checklist
+## Employee credential bootstrap
+
+- For newly added employees, Keycloak `username` is set to the employee `emailAddress`.
+- New employee accounts are initialized with default password `ChangeMe123!`, which users can change on first login.
+
+## Action checklist
 
 - [x] Keep Keycloak realm role model minimal (`HR_ADMIN`, `EMPLOYEE`) for current scope.
 - [x] Protect employee endpoints with explicit authorization annotations.

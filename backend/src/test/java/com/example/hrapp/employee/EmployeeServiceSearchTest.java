@@ -42,15 +42,16 @@ class EmployeeServiceSearchTest {
 
     @BeforeEach
     void setUp() {
-        KeycloakAdminProperties properties = new KeycloakAdminProperties();
-        properties.setServerUrl("http://localhost:8080");
-        properties.setRealm("hr");
-        properties.setClientId("dummy-client");
-        properties.setClientSecret("dummy-secret");
-        properties.setEmployeeRole("EMPLOYEE");
-        properties.setEmployeeDomain("company.local");
-        properties.setTemporaryPassword("ChangeMe123!");
-        properties.setTemporaryPasswordEnabled(true);
+        KeycloakAdminProperties properties = new KeycloakAdminProperties(
+            "http://localhost:8080",
+            "hr",
+            "dummy-client",
+            "dummy-secret",
+            "EMPLOYEE",
+            "company.local",
+            "ChangeMe123!",
+            true
+        );
 
         keycloakAdminClient = new RecordingKeycloakAdminClient(properties);
         employeeService = new EmployeeService(employeeRepository, employeeMapper, keycloakAdminClient);
@@ -72,7 +73,7 @@ class EmployeeServiceSearchTest {
         assertThat(result.getNumber()).isEqualTo(0);
         assertThat(result.getSize()).isEqualTo(25);
         assertThat(result.getContent())
-            .extracting(EmployeeSummaryDTO::getLastName)
+            .extracting(EmployeeSummaryDTO::lastName)
             .containsExactly("Smith", "Smithson");
     }
 
@@ -104,7 +105,7 @@ class EmployeeServiceSearchTest {
         Page<EmployeeSummaryDTO> result = employeeService.searchEmployees("emp-000201", "Smith", pageable);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
-        assertThat(result.getContent()).extracting(EmployeeSummaryDTO::getEmployeeId).containsExactly("EMP-000201");
+        assertThat(result.getContent()).extracting(EmployeeSummaryDTO::employeeId).containsExactly("EMP-000201");
         verify(employeeRepository, never()).findByLastNameContainingIgnoreCase(any(String.class), eq(pageable));
     }
 
@@ -120,7 +121,7 @@ class EmployeeServiceSearchTest {
         Page<EmployeeSummaryDTO> result = employeeService.searchEmployees(null, "smith", pageable);
 
         assertThat(result.getTotalElements()).isEqualTo(1);
-        assertThat(result.getContent()).extracting(EmployeeSummaryDTO::getLastName).containsExactly("Smith");
+        assertThat(result.getContent()).extracting(EmployeeSummaryDTO::lastName).containsExactly("Smith");
         verify(employeeRepository, never()).findByEmployeeIdIgnoreCase(any(String.class), eq(pageable));
     }
 
@@ -141,19 +142,20 @@ class EmployeeServiceSearchTest {
         Employee existingEmployee = employee("EMP-000201", "John", "Doe");
         when(employeeRepository.findByEmployeeId(eq("EMP-000201"))).thenReturn(java.util.Optional.of(existingEmployee));
 
-        EmployeeUpdateDTO request = new EmployeeUpdateDTO();
-        request.setEmployeeId("EMP-000201");
-        request.setFirstName("John");
-        request.setLastName("Doe");
-        request.setJobTitle("Engineer");
-        request.setDateOfBirth(LocalDate.of(1990, 1, 1));
-        request.setGender("Male");
-        request.setDateOfHire(LocalDate.of(2024, 1, 1));
-        request.setDateOfTermination(null);
-        request.setHomeAddress("{}");
-        request.setMailingAddress("{}");
-        request.setTelephoneNumber("+1-555-0100");
-        request.setEmailAddress("john.changed@example.com");
+        EmployeeUpdateDTO request = new EmployeeUpdateDTO(
+            "EMP-000201",
+            "John",
+            "Doe",
+            "Engineer",
+            LocalDate.of(1990, 1, 1),
+            "Male",
+            LocalDate.of(2024, 1, 1),
+            null,
+            "{}",
+            "{}",
+            "+1-555-0100",
+            "john.changed@example.com"
+        );
 
         assertThatThrownBy(() -> employeeService.updateByEmployeeId("EMP-000201", request))
             .isInstanceOf(BadRequestException.class)
@@ -167,8 +169,12 @@ class EmployeeServiceSearchTest {
         Employee existingEmployee = employee("EMP-000202", "Jane", "Doe");
         when(employeeRepository.findByEmployeeId("EMP-000202")).thenReturn(java.util.Optional.of(existingEmployee));
 
-        EmployeeContactUpdateDTO request = new EmployeeContactUpdateDTO();
-        request.setEmailAddress("jane.changed@example.com");
+        EmployeeContactUpdateDTO request = new EmployeeContactUpdateDTO(
+            null,
+            null,
+            null,
+            "jane.changed@example.com"
+        );
 
         assertThatThrownBy(() -> employeeService.patchContactByEmployeeId("EMP-000202", request))
             .isInstanceOf(BadRequestException.class)
@@ -184,8 +190,7 @@ class EmployeeServiceSearchTest {
         when(employeeRepository.findByEmployeeId("EMP-000401")).thenReturn(java.util.Optional.of(existingEmployee));
         when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        EmployeeUpdateDTO request = buildUpdateRequest(existingEmployee);
-        request.setDateOfTermination(LocalDate.now());
+        EmployeeUpdateDTO request = buildUpdateRequest(existingEmployee, LocalDate.now());
 
         employeeService.updateByEmployeeId("EMP-000401", request);
 
@@ -200,8 +205,7 @@ class EmployeeServiceSearchTest {
         when(employeeRepository.findByEmployeeId("EMP-000402")).thenReturn(java.util.Optional.of(existingEmployee));
         when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        EmployeeUpdateDTO request = buildUpdateRequest(existingEmployee);
-        request.setDateOfTermination(null);
+        EmployeeUpdateDTO request = buildUpdateRequest(existingEmployee, null);
 
         employeeService.updateByEmployeeId("EMP-000402", request);
 
@@ -209,21 +213,21 @@ class EmployeeServiceSearchTest {
             .containsExactly(new EnableSyncCall(existingEmployee.getEmailAddress(), true));
     }
 
-    private EmployeeUpdateDTO buildUpdateRequest(Employee existingEmployee) {
-        EmployeeUpdateDTO request = new EmployeeUpdateDTO();
-        request.setEmployeeId(existingEmployee.getEmployeeId());
-        request.setFirstName(existingEmployee.getFirstName());
-        request.setLastName(existingEmployee.getLastName());
-        request.setJobTitle(existingEmployee.getJobTitle());
-        request.setDateOfBirth(existingEmployee.getDateOfBirth());
-        request.setGender(existingEmployee.getGender());
-        request.setDateOfHire(existingEmployee.getDateOfHire());
-        request.setDateOfTermination(existingEmployee.getDateOfTermination());
-        request.setHomeAddress(existingEmployee.getHomeAddress());
-        request.setMailingAddress(existingEmployee.getMailingAddress());
-        request.setTelephoneNumber(existingEmployee.getTelephoneNumber());
-        request.setEmailAddress(existingEmployee.getEmailAddress());
-        return request;
+    private EmployeeUpdateDTO buildUpdateRequest(Employee existingEmployee, LocalDate dateOfTermination) {
+        return new EmployeeUpdateDTO(
+            existingEmployee.getEmployeeId(),
+            existingEmployee.getFirstName(),
+            existingEmployee.getLastName(),
+            existingEmployee.getJobTitle(),
+            existingEmployee.getDateOfBirth(),
+            existingEmployee.getGender(),
+            existingEmployee.getDateOfHire(),
+            dateOfTermination,
+            existingEmployee.getHomeAddress(),
+            existingEmployee.getMailingAddress(),
+            existingEmployee.getTelephoneNumber(),
+            existingEmployee.getEmailAddress()
+        );
     }
 
     private static final class RecordingKeycloakAdminClient extends KeycloakAdminClient {

@@ -10,23 +10,29 @@ import org.springframework.stereotype.Component;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Maps between employee entities and API DTOs.
+ *
+ * <p>Timestamp ownership stays in the backend layer to ensure consistent audit fields regardless
+ * of client payload contents.</p>
+ */
 @Component
 public class EmployeeMapper {
 
     public Employee toEntity(EmployeeCreateDTO source) {
         Employee employee = new Employee();
         employee.setId(UUID.randomUUID());
-        employee.setFirstName(source.getFirstName());
-        employee.setLastName(source.getLastName());
-        employee.setJobTitle(source.getJobTitle());
-        employee.setDateOfBirth(source.getDateOfBirth());
-        employee.setGender(source.getGender());
-        employee.setDateOfHire(source.getDateOfHire());
-        employee.setDateOfTermination(source.getDateOfTermination());
-        employee.setHomeAddress(source.getHomeAddress());
-        employee.setMailingAddress(source.getMailingAddress());
-        employee.setTelephoneNumber(source.getTelephoneNumber());
-        employee.setEmailAddress(source.getEmailAddress());
+        employee.setFirstName(source.firstName());
+        employee.setLastName(source.lastName());
+        employee.setJobTitle(source.jobTitle());
+        employee.setDateOfBirth(source.dateOfBirth());
+        employee.setGender(source.gender());
+        employee.setDateOfHire(source.dateOfHire());
+        employee.setDateOfTermination(source.dateOfTermination());
+        employee.setHomeAddress(source.homeAddress());
+        employee.setMailingAddress(source.mailingAddress());
+        employee.setTelephoneNumber(source.telephoneNumber());
+        employee.setEmailAddress(source.emailAddress());
 
         OffsetDateTime now = OffsetDateTime.now();
         employee.setCreatedAt(now);
@@ -35,63 +41,63 @@ public class EmployeeMapper {
     }
 
     public void updateEntity(EmployeeUpdateDTO source, Employee target) {
-        target.setEmployeeId(source.getEmployeeId());
-        target.setFirstName(source.getFirstName());
-        target.setLastName(source.getLastName());
-        target.setJobTitle(source.getJobTitle());
-        target.setDateOfBirth(source.getDateOfBirth());
-        target.setGender(source.getGender());
-        target.setDateOfHire(source.getDateOfHire());
-        target.setDateOfTermination(source.getDateOfTermination());
-        target.setHomeAddress(source.getHomeAddress());
-        target.setMailingAddress(source.getMailingAddress());
-        target.setTelephoneNumber(source.getTelephoneNumber());
+        target.setEmployeeId(source.employeeId());
+        target.setFirstName(source.firstName());
+        target.setLastName(source.lastName());
+        target.setJobTitle(source.jobTitle());
+        target.setDateOfBirth(source.dateOfBirth());
+        target.setGender(source.gender());
+        target.setDateOfHire(source.dateOfHire());
+        target.setDateOfTermination(source.dateOfTermination());
+        target.setHomeAddress(source.homeAddress());
+        target.setMailingAddress(source.mailingAddress());
+        target.setTelephoneNumber(source.telephoneNumber());
         target.setUpdatedAt(OffsetDateTime.now());
     }
 
     public void updateContactFields(EmployeeContactUpdateDTO source, Employee target) {
-        if (source.getHomeAddress() != null) {
-            target.setHomeAddress(source.getHomeAddress());
+        if (source.homeAddress() != null) {
+            target.setHomeAddress(source.homeAddress());
         }
-        if (source.getMailingAddress() != null) {
-            target.setMailingAddress(source.getMailingAddress());
+        if (source.mailingAddress() != null) {
+            target.setMailingAddress(source.mailingAddress());
         }
-        if (source.getTelephoneNumber() != null) {
-            target.setTelephoneNumber(source.getTelephoneNumber());
+        if (source.telephoneNumber() != null) {
+            target.setTelephoneNumber(source.telephoneNumber());
         }
         target.setUpdatedAt(OffsetDateTime.now());
     }
 
     public EmployeeSummaryDTO toSummaryDTO(Employee source) {
-        EmployeeSummaryDTO dto = new EmployeeSummaryDTO();
-        dto.setId(source.getId());
-        dto.setEmployeeId(source.getEmployeeId());
-        dto.setFirstName(source.getFirstName());
-        dto.setLastName(source.getLastName());
-        dto.setJobTitle(source.getJobTitle());
-        dto.setEmailAddress(source.getEmailAddress());
-        dto.setDateOfHire(source.getDateOfHire());
-        dto.setDateOfTermination(source.getDateOfTermination());
-        return dto;
+        return new EmployeeSummaryDTO(
+            source.getId(),
+            source.getEmployeeId(),
+            source.getFirstName(),
+            source.getLastName(),
+            source.getJobTitle(),
+            source.getEmailAddress(),
+            source.getDateOfHire(),
+            source.getDateOfTermination()
+        );
     }
 
     public EmployeeDetailsDTO toDetailsDTO(Employee source) {
-        EmployeeDetailsDTO dto = new EmployeeDetailsDTO();
-        dto.setId(source.getId());
-        dto.setEmployeeId(source.getEmployeeId());
-        dto.setFirstName(source.getFirstName());
-        dto.setLastName(source.getLastName());
-        dto.setJobTitle(source.getJobTitle());
-        dto.setDateOfBirth(source.getDateOfBirth());
-        dto.setGender(source.getGender());
-        dto.setDateOfHire(source.getDateOfHire());
-        dto.setDateOfTermination(source.getDateOfTermination());
-        dto.setHomeAddress(source.getHomeAddress());
-        dto.setMailingAddress(source.getMailingAddress());
-        dto.setTelephoneNumber(source.getTelephoneNumber());
-        dto.setEmailAddress(source.getEmailAddress());
-        dto.setCreatedAt(source.getCreatedAt());
-        dto.setUpdatedAt(source.getUpdatedAt());
-        return dto;
+        return new EmployeeDetailsDTO(
+            source.getId(),
+            source.getEmployeeId(),
+            source.getFirstName(),
+            source.getLastName(),
+            source.getJobTitle(),
+            source.getDateOfBirth(),
+            source.getGender(),
+            source.getDateOfHire(),
+            source.getDateOfTermination(),
+            source.getHomeAddress(),
+            source.getMailingAddress(),
+            source.getTelephoneNumber(),
+            source.getEmailAddress(),
+            source.getCreatedAt(),
+            source.getUpdatedAt()
+        );
     }
 }

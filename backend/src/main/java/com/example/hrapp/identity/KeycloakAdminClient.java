@@ -16,7 +16,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.HashMap;
+import java.util.function.Predicate;
 
+/**
+ * Adapter over Keycloak Admin REST APIs for employee identity lifecycle operations.
+ *
+ * <p>The client intentionally centralizes IAM side effects (upsert, role normalization,
+ * temporary password setup, enabled/disabled synchronization) so service-layer code remains
+ * focused on domain workflows.</p>
+ */
 @Component
 public class KeycloakAdminClient {
 
@@ -28,48 +36,36 @@ public class KeycloakAdminClient {
     public KeycloakAdminClient(KeycloakAdminProperties properties) {
         this.properties = properties;
         this.restClient = RestClient.builder()
-            .baseUrl(properties.getServerUrl())
+            .baseUrl(properties.serverUrl())
             .build();
     }
 
+    /**
+     * Upserts an employee user and normalizes role mappings to employee-only role.
+     */
     @Retry(name = "keycloakAdminApi", fallbackMethod = "upsertEmployeeUserFallback")
     public void upsertEmployeeUser(String employeeId, String emailAddress, String firstName, String lastName) {
         upsertEmployeeUserInternal(employeeId, emailAddress, firstName, lastName);
     }
 
+    /**
+     * Synchronizes Keycloak account enabled state by user email.
+     */
     @Retry(name = "keycloakAdminApi", fallbackMethod = "setUserEnabledByEmailFallback")
     public void setUserEnabledByEmail(String emailAddress, boolean enabled) {
-        String normalizedEmail = emailAddress == null ? "" : emailAddress.trim().toLowerCase();
-        if (normalizedEmail.isBlank()) {
-            return;
-        }
+        Optional.ofNullable(emailAddress)
+            .map(this::normalizeLower)
+            .filter(Predicate.not(String::isBlank))
+            .ifPresent(normalizedEmail -> {
+                String accessToken = fetchAdminAccessToken();
+                String username = buildUsername(normalizedEmail);
 
-        String accessToken = fetchAdminAccessToken();
-        String username = buildUsername(normalizedEmail);
-
-        Optional<String> userIdOpt = findUserId(accessToken, username);
-        if (userIdOpt.isEmpty()) {
-            log.info("No Keycloak user found for email={}, skipping enabled sync", normalizedEmail);
-            return;
-        }
-
-        String userId = userIdOpt.get();
-        Map<String, Object> currentUser = restClient.get()
-            .uri("/admin/realms/{realm}/users/{userId}", properties.getRealm(), userId)
-            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
-            .retrieve()
-            .body(Map.class);
-
-        Map<String, Object> payload = currentUser == null ? new HashMap<>() : new HashMap<>(currentUser);
-        payload.put("enabled", enabled);
-
-        restClient.put()
-            .uri("/admin/realms/{realm}/users/{userId}", properties.getRealm(), userId)
-            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(payload)
-            .retrieve()
-            .toBodilessEntity();
+                findUserId(accessToken, username)
+                    .ifPresentOrElse(
+                        userId -> updateUserEnabledState(accessToken, userId, enabled),
+                        () -> log.info("No Keycloak user found for email={}, skipping enabled sync", normalizedEmail)
+                    );
+            });
     }
 
     private void upsertEmployeeUserInternal(String employeeId, String emailAddress, String firstName, String lastName) {
@@ -83,17 +79,17 @@ public class KeycloakAdminClient {
 
         updateUser(accessToken, userId, username, emailAddress, employeeId, normalizedFirstName, normalizedLastName);
         setTemporaryPassword(accessToken, userId);
-        syncRealmRolesToEmployeeOnly(accessToken, userId, properties.getEmployeeRole());
+        syncRealmRolesToEmployeeOnly(accessToken, userId, properties.employeeRole());
     }
 
     private String fetchAdminAccessToken() {
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("grant_type", "client_credentials");
-        form.add("client_id", properties.getClientId());
-        form.add("client_secret", properties.getClientSecret());
+        form.add("client_id", properties.clientId());
+        form.add("client_secret", properties.clientSecret());
 
         Map<String, Object> response = restClient.post()
-            .uri("/realms/{realm}/protocol/openid-connect/token", properties.getRealm())
+            .uri("/realms/{realm}/protocol/openid-connect/token", properties.realm())
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(form)
             .retrieve()
@@ -112,22 +108,21 @@ public class KeycloakAdminClient {
                 .path("/admin/realms/{realm}/users")
                 .queryParam("username", username)
                 .queryParam("exact", true)
-                .build(properties.getRealm()))
+                .build(properties.realm()))
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
             .body(List.class);
 
-        if (users == null || users.isEmpty()) {
-            return Optional.empty();
-        }
-
-        Object id = users.get(0).get("id");
-        return id == null ? Optional.empty() : Optional.of(id.toString());
+        return Optional.ofNullable(users)
+            .filter(Predicate.not(List::isEmpty))
+            .map(result -> result.get(0))
+            .map(result -> result.get("id"))
+            .map(Object::toString);
     }
 
     private String createUser(String accessToken, String username, String emailAddress, String employeeId, String firstName, String lastName) {
         restClient.post()
-            .uri("/admin/realms/{realm}/users", properties.getRealm())
+            .uri("/admin/realms/{realm}/users", properties.realm())
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .contentType(MediaType.APPLICATION_JSON)
             .body(buildUserPayload(username, emailAddress, employeeId, firstName, lastName, true))
@@ -140,7 +135,7 @@ public class KeycloakAdminClient {
 
     private void updateUser(String accessToken, String userId, String username, String emailAddress, String employeeId, String firstName, String lastName) {
         restClient.put()
-            .uri("/admin/realms/{realm}/users/{userId}", properties.getRealm(), userId)
+            .uri("/admin/realms/{realm}/users/{userId}", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .contentType(MediaType.APPLICATION_JSON)
             .body(buildUserPayload(username, emailAddress, employeeId, firstName, lastName, true))
@@ -149,18 +144,19 @@ public class KeycloakAdminClient {
     }
 
     private void setTemporaryPassword(String accessToken, String userId) {
-        if (properties.getTemporaryPassword() == null || properties.getTemporaryPassword().isBlank()) {
+        String temporaryPassword = properties.temporaryPassword();
+        if (temporaryPassword == null || temporaryPassword.isBlank()) {
             return;
         }
 
         Map<String, Object> passwordPayload = Map.of(
             "type", "password",
-            "value", properties.getTemporaryPassword(),
-            "temporary", properties.isTemporaryPasswordEnabled()
+            "value", temporaryPassword,
+            "temporary", properties.temporaryPasswordEnabled()
         );
 
         restClient.put()
-            .uri("/admin/realms/{realm}/users/{userId}/reset-password", properties.getRealm(), userId)
+            .uri("/admin/realms/{realm}/users/{userId}/reset-password", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .contentType(MediaType.APPLICATION_JSON)
             .body(passwordPayload)
@@ -171,14 +167,14 @@ public class KeycloakAdminClient {
     @SuppressWarnings("unchecked")
     private void syncRealmRolesToEmployeeOnly(String accessToken, String userId, String roleName) {
         List<Map<String, Object>> userRoles = restClient.get()
-            .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.getRealm(), userId)
+            .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
             .body(List.class);
 
         if (userRoles != null && !userRoles.isEmpty()) {
             restClient.method(org.springframework.http.HttpMethod.DELETE)
-                .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.getRealm(), userId)
+                .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.realm(), userId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(userRoles)
@@ -187,13 +183,13 @@ public class KeycloakAdminClient {
         }
 
         Map<String, Object> roleRepresentation = restClient.get()
-            .uri("/admin/realms/{realm}/roles/{roleName}", properties.getRealm(), roleName)
+            .uri("/admin/realms/{realm}/roles/{roleName}", properties.realm(), roleName)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
             .body(Map.class);
 
         restClient.post()
-            .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.getRealm(), userId)
+            .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .contentType(MediaType.APPLICATION_JSON)
             .body(List.of(roleRepresentation))
@@ -220,7 +216,7 @@ public class KeycloakAdminClient {
     }
 
     private String buildUsername(String emailAddress) {
-        return emailAddress == null ? "" : emailAddress.trim().toLowerCase();
+        return normalizeLower(emailAddress);
     }
 
     private String normalizeName(String value) {
@@ -229,6 +225,29 @@ public class KeycloakAdminClient {
 
     private String bearer(String accessToken) {
         return "Bearer " + accessToken;
+    }
+
+    private void updateUserEnabledState(String accessToken, String userId, boolean enabled) {
+        Map<String, Object> currentUser = restClient.get()
+            .uri("/admin/realms/{realm}/users/{userId}", properties.realm(), userId)
+            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+            .retrieve()
+            .body(Map.class);
+
+        Map<String, Object> payload = currentUser == null ? new HashMap<>() : new HashMap<>(currentUser);
+        payload.put("enabled", enabled);
+
+        restClient.put()
+            .uri("/admin/realms/{realm}/users/{userId}", properties.realm(), userId)
+            .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
+            .contentType(MediaType.APPLICATION_JSON)
+            .body(payload)
+            .retrieve()
+            .toBodilessEntity();
+    }
+
+    private String normalizeLower(String value) {
+        return value == null ? "" : value.trim().toLowerCase();
     }
 
     @SuppressWarnings("unused")

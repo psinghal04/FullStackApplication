@@ -10,6 +10,13 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * Employee persistence model.
+ *
+ * <p>Address fields are stored as JSON text in the application layer while the backing database
+ * uses JSON-capable columns, allowing flexible payload structure without tightly coupling to a
+ * nested Java object graph.</p>
+ */
 @Entity
 @Table(
     name = "employees",
