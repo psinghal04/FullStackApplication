@@ -83,7 +83,6 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
         return candidate.toUpperCase();
     }
 
-    @SuppressWarnings("unchecked")
     private Collection<? extends GrantedAuthority> extractRealmRoles(Jwt jwt) {
         Object realmAccessObj = jwt.getClaim("realm_access");
         if (!(realmAccessObj instanceof Map<?, ?> realmAccessMap)) {

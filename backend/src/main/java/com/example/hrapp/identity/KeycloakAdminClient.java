@@ -4,6 +4,7 @@ import com.example.hrapp.common.exception.KeycloakProvisioningException;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -93,7 +94,7 @@ public class KeycloakAdminClient {
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(form)
             .retrieve()
-            .body(Map.class);
+            .body(new ParameterizedTypeReference<>() {});
 
         if (response == null || response.get("access_token") == null) {
             throw new RestClientException("Missing access token from Keycloak");
@@ -101,7 +102,6 @@ public class KeycloakAdminClient {
         return response.get("access_token").toString();
     }
 
-    @SuppressWarnings("unchecked")
     private Optional<String> findUserId(String accessToken, String username) {
         List<Map<String, Object>> users = restClient.get()
             .uri(uriBuilder -> uriBuilder
@@ -111,7 +111,7 @@ public class KeycloakAdminClient {
                 .build(properties.realm()))
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
-            .body(List.class);
+            .body(new ParameterizedTypeReference<>() {});
 
         return Optional.ofNullable(users)
             .filter(Predicate.not(List::isEmpty))
@@ -164,13 +164,12 @@ public class KeycloakAdminClient {
             .toBodilessEntity();
     }
 
-    @SuppressWarnings("unchecked")
     private void syncRealmRolesToEmployeeOnly(String accessToken, String userId, String roleName) {
         List<Map<String, Object>> userRoles = restClient.get()
             .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
-            .body(List.class);
+            .body(new ParameterizedTypeReference<>() {});
 
         if (userRoles != null && !userRoles.isEmpty()) {
             restClient.method(org.springframework.http.HttpMethod.DELETE)
@@ -186,7 +185,7 @@ public class KeycloakAdminClient {
             .uri("/admin/realms/{realm}/roles/{roleName}", properties.realm(), roleName)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
-            .body(Map.class);
+            .body(new ParameterizedTypeReference<>() {});
 
         restClient.post()
             .uri("/admin/realms/{realm}/users/{userId}/role-mappings/realm", properties.realm(), userId)
@@ -232,7 +231,7 @@ public class KeycloakAdminClient {
             .uri("/admin/realms/{realm}/users/{userId}", properties.realm(), userId)
             .header(HttpHeaders.AUTHORIZATION, bearer(accessToken))
             .retrieve()
-            .body(Map.class);
+            .body(new ParameterizedTypeReference<>() {});
 
         Map<String, Object> payload = currentUser == null ? new HashMap<>() : new HashMap<>(currentUser);
         payload.put("enabled", enabled);

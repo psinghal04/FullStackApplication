@@ -119,17 +119,34 @@ NOTE: The Docker Compose runtime environment is for local execution only. In a r
 
 From the repository root:
 
+Pre-build checklist (before `docker compose ... up --build`):
+
+```bash
+cd backend
+./mvnw clean -DskipTests package
+cd ..
+```
+
+- Backend JAR build is required because `backend/Dockerfile` copies `target/*.jar`.
+- Frontend prebuild is not required; the frontend Docker image runs `npm run build` during image build.
+
 1. Start all services:
 
 ```bash
 docker compose -f infra/docker-compose.yml up --build -d
 ```
 
+If port `8081` is already in use on your machine, start with an override:
+
+```bash
+BACKEND_HOST_PORT=18081 docker compose -f infra/docker-compose.yml up --build -d
+```
+
 2. Verify container health:
 
 ```bash
 docker compose -f infra/docker-compose.yml ps
-curl http://localhost:8081/actuator/health
+curl http://localhost:${BACKEND_HOST_PORT:-8081}/actuator/health
 curl http://localhost:8080/realms/hr/.well-known/openid-configuration
 ```
 
@@ -144,7 +161,7 @@ cd ..
 4. Open the application:
 
 - Frontend: `http://localhost:4200`
-- Backend API: `http://localhost:8081`
+- Backend API: `http://localhost:${BACKEND_HOST_PORT:-8081}`
 - Keycloak: `http://localhost:8080`
 
 5. Default seeded user (from realm import):

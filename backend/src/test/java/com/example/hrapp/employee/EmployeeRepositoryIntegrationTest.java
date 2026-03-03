@@ -24,7 +24,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class EmployeeRepositoryIntegrationTest {
 
     @Container
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    @SuppressWarnings("resource")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
         .withDatabaseName("hr_test")
         .withUsername("hr_test")
         .withPassword("hr_test");
