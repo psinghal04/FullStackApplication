@@ -13,7 +13,7 @@ interface TokenClaims {
   realm_access?: {
     roles?: string[];
   };
-  employee_id?: string;
+  employee_id?: string | string[];
 }
 
 interface E2EMockAuthConfig {
@@ -149,8 +149,15 @@ export class AuthService {
   }
 
   private extractEmployeeId(claims: TokenClaims): string | null {
-    if (claims.employee_id && claims.employee_id.trim().length > 0) {
+    if (typeof claims.employee_id === 'string' && claims.employee_id.trim().length > 0) {
       return claims.employee_id;
+    }
+
+    if (Array.isArray(claims.employee_id)) {
+      const firstId = claims.employee_id.find((value) => typeof value === 'string' && value.trim().length > 0);
+      if (firstId) {
+        return firstId.trim();
+      }
     }
 
     const preferredUsername = claims.preferred_username?.trim();

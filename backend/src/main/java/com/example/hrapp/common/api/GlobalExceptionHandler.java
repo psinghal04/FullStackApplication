@@ -2,9 +2,14 @@ package com.example.hrapp.common.api;
 
 import com.example.hrapp.common.exception.HrAppException;
 import jakarta.validation.ConstraintViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -21,6 +26,8 @@ import java.util.stream.Collectors;
  */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(HrAppException.class)
     public ResponseEntity<ApiErrorResponse> handleHrAppException(HrAppException exception) {
@@ -47,8 +54,19 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
+    @ExceptionHandler({AuthorizationDeniedException.class, AccessDeniedException.class})
+    public ResponseEntity<ApiErrorResponse> handleAccessDenied(Exception exception) {
+        return build(HttpStatus.FORBIDDEN, "Access denied");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiErrorResponse> handleAuthentication(AuthenticationException exception) {
+        return build(HttpStatus.UNAUTHORIZED, "Authentication required");
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(Exception exception) {
+        log.error("Unhandled server exception", exception);
         return build(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error");
     }
 

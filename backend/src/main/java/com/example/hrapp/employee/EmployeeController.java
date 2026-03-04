@@ -72,7 +72,7 @@ public class EmployeeController {
      * Convenience endpoint to resolve the caller's own profile.
      */
     @GetMapping("/me")
-    @PreAuthorize("hasRole('EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('EMPLOYEE','HR_ADMIN')")
     public ResponseEntity<EmployeeDetailsDTO> getMyEmployeeProfile(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (!(principal instanceof EmployeeJwtPrincipal employeePrincipal)) {

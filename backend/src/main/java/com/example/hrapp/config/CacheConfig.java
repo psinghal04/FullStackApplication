@@ -1,5 +1,6 @@
 package com.example.hrapp.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -30,7 +31,13 @@ public class CacheConfig {
         RedisConnectionFactory redisConnectionFactory,
         @Value("${app.cache.employee-ttl-seconds:60}") long ttlSeconds
     ) {
-        GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer();
+        ObjectMapper redisObjectMapper = new ObjectMapper();
+        redisObjectMapper.findAndRegisterModules();
+
+        GenericJackson2JsonRedisSerializer serializer = GenericJackson2JsonRedisSerializer.builder()
+            .objectMapper(redisObjectMapper)
+            .defaultTyping(true)
+            .build();
 
         RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
             .entryTtl(Duration.ofSeconds(ttlSeconds))
