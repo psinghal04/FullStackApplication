@@ -7,7 +7,7 @@ KEYCLOAK_URL=${KEYCLOAK_URL:-http://localhost:8080}
 KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN:-admin}
 KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin123}
 REALM=${REALM:-hr}
-USERNAME=${USERNAME:-stacey.smith@company.local}
+ADMIN_USERNAME=${ADMIN_USERNAME:-stacey.smith@company.local}
 PASSWORD=${PASSWORD:-ChangeMe123!}
 EMPLOYEE_ID=${EMPLOYEE_ID:-HR-ADMIN-0001}
 POSTGRES_CONTAINER=${POSTGRES_CONTAINER:-hr-postgres}
@@ -22,32 +22,32 @@ docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh config credential
   --user "${KEYCLOAK_ADMIN}" \
   --password "${KEYCLOAK_ADMIN_PASSWORD}"
 
-USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?username=${USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
+USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?username=${ADMIN_USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
 
 if [[ -z "${USER_ID}" ]]; then
-  USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?email=${USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
+  USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?email=${ADMIN_USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
 fi
 
 if [[ -z "${USER_ID}" ]]; then
-  echo "Creating user ${USERNAME}..."
+  echo "Creating user ${ADMIN_USERNAME}..."
   docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh create users -r "${REALM}" \
-    -s "username=${USERNAME}" \
+    -s "username=${ADMIN_USERNAME}" \
     -s "enabled=true" \
     -s "firstName=Stacey" \
     -s "lastName=Smith" \
-    -s "email=${USERNAME}"
+    -s "email=${ADMIN_USERNAME}"
 fi
 
 if [[ -z "${USER_ID}" ]]; then
-  USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?username=${USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
+  USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?username=${ADMIN_USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
 fi
 
 if [[ -z "${USER_ID}" ]]; then
-  USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?email=${USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
+  USER_ID=$(docker exec "${KEYCLOAK_CONTAINER}" /opt/keycloak/bin/kcadm.sh get "users?email=${ADMIN_USERNAME}" -r "${REALM}" --fields id --format csv --noquotes | tail -n1)
 fi
 
 if [[ -z "${USER_ID}" ]]; then
-  echo "Could not resolve user id for ${USERNAME}."
+  echo "Could not resolve user id for ${ADMIN_USERNAME}."
   exit 1
 fi
 
@@ -129,7 +129,7 @@ INSERT INTO employees (
     '500 Market St, Austin, TX 78701, US',
     '500 Market St, Austin, TX 78701, US',
   '+1-512-555-0101',
-  '${USERNAME}',
+  '${ADMIN_USERNAME}',
   NOW(),
   NOW()
 )
@@ -142,4 +142,4 @@ SET
   updated_at = NOW();
 "
 
-echo "Done. User ${USERNAME} is seeded with role HR_ADMIN and employee_id=${EMPLOYEE_ID}."
+echo "Done. User ${ADMIN_USERNAME} is seeded with role HR_ADMIN and employee_id=${EMPLOYEE_ID}."

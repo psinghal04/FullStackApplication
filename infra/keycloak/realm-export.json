@@ -97,7 +97,7 @@
         ]
       },
       "realmRoles": [
-        "HR_ADMIN"
+        "HR_ADMIN", "EMPLOYEE"
       ],
       "credentials": [
         {

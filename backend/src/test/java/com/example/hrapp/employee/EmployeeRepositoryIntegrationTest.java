@@ -45,16 +45,16 @@ class EmployeeRepositoryIntegrationTest {
 
     @Test
     void findByLastNameContainingIgnoreCase_returnsMultiplePartialMatchesWithPagination() {
-        employeeRepository.save(buildEmployee("EMP-100001", "Alice", "Smith", "alice.smith@example.com"));
-        employeeRepository.save(buildEmployee("EMP-100002", "Bob", "Smithson", "bob.smithson@example.com"));
+        employeeRepository.save(buildEmployee("EMP-100001", "Alice", "SpecMatchAlpha", "alice.smith@example.com"));
+        employeeRepository.save(buildEmployee("EMP-100002", "Bob", "SpecMatchBeta", "bob.smithson@example.com"));
         employeeRepository.save(buildEmployee("EMP-100003", "Chris", "Anderson", "chris.anderson@example.com"));
 
-        Page<Employee> result = employeeRepository.findByLastNameContainingIgnoreCase("smi", PageRequest.of(0, 25));
+        Page<Employee> result = employeeRepository.findByLastNameContainingIgnoreCase("specmatch", PageRequest.of(0, 25));
 
         assertThat(result.getTotalElements()).isEqualTo(2);
         assertThat(result.getContent())
             .extracting(Employee::getLastName)
-            .containsExactlyInAnyOrder("Smith", "Smithson");
+            .containsExactlyInAnyOrder("SpecMatchAlpha", "SpecMatchBeta");
     }
 
     @Test
