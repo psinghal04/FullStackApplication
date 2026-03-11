@@ -108,7 +108,47 @@ onTTFB(emit);
 onFCP(emit);
 ```
 
-## 6) Execution plan (recommended order)
+## 6) Backend query optimization and N+1 prevention
+
+### Manager relationship eager loading (V2 API)
+
+The V2 API introduces manager-employee relationships with careful query optimization to prevent N+1 query problems.
+
+Challenge:
+
+- JPA entity relationships default to `LAZY` fetch.
+- Loading an employee and then accessing `.getManager()` triggers an additional query.
+- Loading a list of subordinates and accessing each subordinate's manager causes N+1 queries.
+
+Solution:
+
+- Custom JPQL queries in `EmployeeRepository` use `LEFT JOIN FETCH` to eagerly load manager relationships.
+- Query examples:
+  ```java
+  @Query("SELECT e FROM Employee e LEFT JOIN FETCH e.manager WHERE e.employeeId = :employeeId")
+  Optional<Employee> findByEmployeeIdWithManager(@Param("employeeId") String employeeId);
+  
+  @Query("SELECT s FROM Employee s LEFT JOIN FETCH s.manager WHERE s.manager.id = :managerId")
+  List<Employee> findByManagerId(@Param("managerId") UUID managerId);
+  ```
+
+- Service layer uses these custom repository methods for V2 endpoints instead of default findBy methods.
+- Single query fetches employee + manager data, avoiding lazy-load round trips.
+
+Benefits:
+
+- Predictable query count (1 query for employee+manager, 1 query for subordinates+their managers).
+- Lower latency for V2 API responses.
+- Scales better under load (fewer DB connections per request).
+
+### Redis caching strategy
+
+- Selected read paths use Redis for short-lived caching.
+- Cache keys are based on `employeeId`.
+- Cache invalidation on employee updates ensures consistency.
+- TTL configured to balance freshness and cache hit rate.
+
+## 7) Execution plan (recommended order)
 
 - [ ] Baseline current metrics (Lighthouse + web-vitals dev capture).
 - [x] Implement lazy loading first (lowest risk, high impact).

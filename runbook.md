@@ -36,6 +36,11 @@ docker compose -f infra/docker-compose.yml logs -f backend
 docker exec -it hr-postgres psql -U hr -d hrapp -c "SELECT installed_rank, version, description, success FROM flyway_schema_history ORDER BY installed_rank;"
 ```
 
+Expected migrations:
+- V1: Create employees table
+- V2: Enforce case-insensitive unique email
+- V3: Add manager relationship (manager_id column with self-referencing FK)
+
 ## 3) Re-seed Keycloak HR admin (Stacey)
 
 ```bash

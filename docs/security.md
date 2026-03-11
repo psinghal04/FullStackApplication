@@ -150,8 +150,13 @@ Current backend enforcement path:
    - Extracts `employee_id` claim into custom principal.
 
 3. **Authorization checks**
-   - `backend/src/main/java/com/example/hrapp/employee/EmployeeController.java`
+   - `backend/src/main/java/com/example/hrapp/employee/EmployeeController.java` (V1 API)
+   - `backend/src/main/java/com/example/hrapp/employee/EmployeeControllerV2.java` (V2 API with manager support)
    - Uses `@PreAuthorize` with role checks and ownership checks, e.g. employee can access only own record via `authentication.principal.employee_id`.
+   - V2 API additions:
+     - Subordinates endpoint allows HR admins OR employees viewing their own direct reports: `hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)`.
+     - Manager data is included in V2 responses for authorized users (HR admins and owning employees).
+     - Manager assignment/modification is restricted to HR admins only.
 
 4. **Termination enforcement**
    - `backend/src/main/java/com/example/hrapp/security/TerminatedEmployeeFilter.java`

@@ -22,6 +22,15 @@ The application models a simple HR domain with role-based access, employee lifec
 
 ## Functional Overview
 
+### API Versioning
+
+The application exposes two API versions:
+
+- **V1** (`/api/v1/employees`): Original employee management without manager relationships.
+- **V2** (`/api/v2/employees`): Enhanced with manager-employee relationships and subordinates.
+
+Both versions remain fully functional. The frontend uses V2 for all operations.
+
 ### Roles
 
 The application uses two primary realm roles:
@@ -33,16 +42,25 @@ The application uses two primary realm roles:
 
 #### HR Admin
 
-- Create employee records.
+- Create employee records with optional manager assignment.
 - Search employees by `employeeId` (exact, case-insensitive) or `lastName` (partial, case-insensitive).
-- View employee details.
-- Perform full employee updates.
+- View employee details including assigned manager.
+- Perform full employee updates including manager assignment/changes.
 - Update employee contact information.
+- View any employee's direct reports.
 
 #### Employee
 
-- View own profile (`/api/v1/employees/me` and corresponding UI route).
+- View own profile including assigned manager and direct reports (read-only).
 - Update own contact fields (home/mailing address, phone) for own record only.
+
+### Manager Relationships (V2 API)
+
+- Employees can optionally have a manager (another employee).
+- Manager assignment is optional and can be set/cleared by HR admins.
+- Employees can view their own manager and direct reports.
+- HR admins can view and modify any manager assignments.
+- Self-management is prevented (employees cannot be their own manager).
 
 ### Cross-cutting business rules
 
@@ -69,6 +87,8 @@ The application uses two primary realm roles:
 - Transactional create flow with Keycloak provisioning and retry/fallback handling.
 - Termination enforcement via dedicated security filter.
 - Correlation ID filter (`X-Correlation-Id`) for traceability.
+- API versioning with backward-compatible v1 and feature-enhanced v2 endpoints.
+- Custom JPQL queries with `JOIN FETCH` for eager loading manager relationships (N+1 prevention).
 
 ### Java modernization checklist (Java 17)
 
@@ -88,9 +108,10 @@ The application uses two primary realm roles:
 ### Data Layer (PostgreSQL + Redis)
 
 - PostgreSQL as source of truth for employee records.
-- Flyway migrations for schema versioning.
+- Flyway migrations for schema versioning (V1: base schema, V2: unique email constraint, V3: manager relationships).
 - Redis-backed caching for selected read paths.
 - `jsonb` storage for flexible address payloads.
+- Self-referencing foreign key for manager-employee relationships with cascade rules.
 
 ### Infrastructure Layer (Docker Compose)
 

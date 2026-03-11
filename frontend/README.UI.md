@@ -34,9 +34,23 @@
   - card layout, Material form controls
   - immutable email display
   - loading skeleton and save progress indicator
+  - displays manager information (read-only)
+  - displays direct reports at bottom
+  - uses V2 API for all operations
+- HR Employee Details (`HrEmployeeDetailsPageComponent`)
+  - editable employee form with manager selection
+  - displays direct reports
+  - uses V2 API with subordinates endpoint
 - Employee Form (`EmployeeFormComponent`)
   - responsive two-column Material form
   - immutable email display with hint
+  - integrated manager selector component
+  - supports V2 API with manager relationships
+- Manager Selector (`ManagerSelectorComponent`)
+  - reusable component for manager search and selection
+  - search by employee ID or last name
+  - displays search results with selection capability
+  - clear/remove manager functionality
 
 ## Test Coverage Updated
 - Added `app-shell.component.spec.ts`

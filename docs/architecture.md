@@ -30,7 +30,16 @@ flowchart LR
 - Redis: short-lived read caching for selected employee reads.
 - Keycloak: identity provider, token issuer, role model, admin provisioning target.
 
-## 2) API contract summary
+## 2) API versioning strategy
+
+The application exposes two API versions:
+
+- **V1** (`/api/v1/employees`): Original employee management API without manager relationships. Remains fully functional for backward compatibility.
+- **V2** (`/api/v2/employees`): Enhanced API with manager-employee relationships, subordinates endpoint, and organizational hierarchy support.
+
+Both versions coexist. V1 endpoints continue to work with the enhanced entity model (manager relationships are simply not exposed in V1 responses). The frontend uses V2 for all operations.
+
+## 3) API contract summary (V1)
 
 Base path: `/api/v1/employees`
 
@@ -163,7 +172,107 @@ Example response (`200`):
 }
 ```
 
-## 3) Data model and field tradeoffs
+## 3.5) API contract summary (V2)
+
+Base path: `//v2/employees`
+
+V2 extends V1 with manager-employee relationship support. All V1 endpoints have V2 equivalents with `manager` field included in responses.
+
+### Key differences from V1
+
+- All response DTOs include `manager: { id, employeeId, firstName, lastName, jobTitle } | null`.
+- Create and update requests accept optional `managerId` field.
+- New endpoint: `GET /api/v2/employees/{employeeId}/subordinates` returns direct reports.
+
+### Create employee with manager (HR admin)
+
+- `POST /api/v2/employees`
+- Auth: `ROLE_HR_ADMIN`
+
+Example request with manager:
+
+```json
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "jobTitle": "Engineer",
+  "dateOfBirth": "1990-01-01",
+  "gender": "Male",
+  "dateOfHire": "2024-01-01",
+  "dateOfTermination": null,
+  "homeAddress": "{\"line1\":\"10 Main St\",\"city\":\"Austin\"}",
+  "mailingAddress": "{\"line1\":\"PO Box 10\",\"city\":\"Austin\"}",
+  "telephoneNumber": "+1-555-0100",
+  "emailAddress": "john.doe@company.local",
+  "managerId": "f1234567-89ab-cdef-0123-456789abcdef"
+}
+```
+
+Example response (`201`):
+
+```json
+{
+  "id": "f5e4c0f6-3f77-4a5c-bcbf-333333333333",
+  "employeeId": "EMP-900001",
+  "firstName": "John",
+  "lastName": "Doe",
+  "jobTitle": "Engineer",
+  "emailAddress": "john.doe@company.local",
+  "dateOfHire": "2024-01-01",
+  "dateOfTermination": null,
+  "manager": {
+    "id": "f1234567-89ab-cdef-0123-456789abcdef",
+    "employeeId": "EMP-900000",
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "jobTitle": "Senior Engineer"
+  }
+}
+```
+
+### Get employee details with manager
+
+- `GET /api/v2/employees/{employeeId}`
+- Auth: `ROLE_HR_ADMIN` or owning `ROLE_EMPLOYEE`
+
+Response includes `manager` field (null if no manager assigned).
+
+### Get employee's direct reports
+
+- `GET /api/v2/employees/{employeeId}/subordinates`
+- Auth: `ROLE_HR_ADMIN` or owning `ROLE_EMPLOYEE` (can view own subordinates)
+
+Example response (`200`):
+
+```json
+[
+  {
+    "id": "f5e4c0f6-3f77-4a5c-bcbf-444444444444",
+    "employeeId": "EMP-900002",
+    "firstName": "Alice",
+    "lastName": "Johnson",
+    "jobTitle": "Junior Engineer",
+    "emailAddress": "alice.johnson@company.local",
+    "dateOfHire": "2024-06-01",
+    "dateOfTermination": null,
+    "manager": {
+      "id": "f5e4c0f6-3f77-4a5c-bcbf-333333333333",
+      "employeeId": "EMP-900001",
+      "firstName": "John",
+      "lastName": "Doe",
+      "jobTitle": "Engineer"
+    }
+  }
+]
+```
+
+Notes:
+
+- Employees can view their own subordinates (ownership check: `#employeeId == authentication.principal.employee_id`).
+- Manager assignment is optional; `managerId` can be null or omitted to clear/leave unassigned.
+- Self-management is validated: cannot set an employee as their own manager (400 error).
+
+## 4) Data model and field tradeoffs
 
 Primary employee fields were chosen to support:
 
@@ -196,7 +305,34 @@ Upgrade option:
 - keep DB `jsonb`, add server-side address schema validation,
 - version API carefully to preserve backward compatibility.
 
-## 4) Authentication and authorization flow
+### Manager relationship modeling
+
+Current implementation (V3 migration):
+
+- `manager_id` column (UUID, nullable) with self-referencing foreign key to `employees.id`.
+- Index on `manager_id` for efficient subordinates queries.
+- `ON DELETE SET NULL` cascade: when a manager is deleted, their direct reports have `manager_id` cleared.
+
+Entity mapping:
+
+- JPA `@ManyToOne` for `manager` relationship (LAZY fetch by default).
+- JPA `@OneToMany` for `subordinates` collection (LAZY fetch by default).
+- Repository uses custom JPQL queries with `LEFT JOIN FETCH` to eagerly load manager relationships when needed, preventing N+1 query issues.
+
+Business rules:
+
+- Manager assignment is optional.
+- Self-management is prevented at service layer validation.
+- Manager can be any active employee (including HR admins).
+- No validation enforcing organizational depth limits (flat hierarchies are supported).
+
+Query optimization:
+
+- `findByEmployeeIdWithManager()`: Eagerly fetches employee with manager in single query.
+- `findByEmployeeIdWithSubordinates()`: Eagerly fetches subordinates and their managers to avoid N+1.
+- Search queries include manager data to populate V2 DTOs efficiently.
+
+## 5) Authentication and authorization flow
 
 ### Login and token flow
 
@@ -224,7 +360,7 @@ Upgrade option:
 - If terminated (`<= today`), request is denied with `403` and `reason: terminated`.
 - On terminated requests, filter also attempts `setUserEnabledByEmail(email, false)` so Keycloak account is disabled for future logins.
 
-## 5) Deployment notes
+## 6) Deployment notes
 
 ### Key environment variables
 

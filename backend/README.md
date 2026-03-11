@@ -1,8 +1,17 @@
 # Backend Notes
 
+## API Versioning
+
+The backend exposes two API versions:
+
+- **V1** (`/api/v1/employees`): Original employee management API
+- **V2** (`/api/v2/employees`): Enhanced API with manager-employee relationships
+
+Both versions coexist and work with the same enhanced entity model. V1 simply omits manager data from responses.
+
 ## Employee creation + Keycloak provisioning
 
-When HR calls `POST /api/v1/employees`:
+When HR calls `POST /api/v1/employees` or `POST /api/v2/employees`:
 
 1. Backend generates a unique `employeeId` in `EMP-######` format.
 2. Employee is saved in the DB (`EmployeeService#create`, transactional).
@@ -35,8 +44,25 @@ When HR calls `POST /api/v1/employees`:
   - enforces unique `employeeId`
   - rejects email changes (`emailAddress cannot be changed once created`)
   - syncs Keycloak enabled state based on termination date
+- `PUT /api/v2/employees/{employeeId}`:
+  - all V1 rules apply
+  - accepts optional `managerId` for manager assignment
+  - validates that managerId exists and prevents self-management
+  - clearing manager: omit or set `managerId` to null
 - `PATCH /api/v1/employees/{employeeId}/contact`:
   - rejects `emailAddress` updates
+
+## Manager relationships (V2 API)
+
+- Optional manager assignment via `managerId` field in create/update requests
+- Self-management validation: returns 400 if employee tries to manage themselves
+- Database: `manager_id` column with self-referencing FK, `ON DELETE SET NULL` cascade
+- Entity: JPA `@ManyToOne` / `@OneToMany` bidirectional relationship with LAZY fetch
+- Query optimization: custom JPQL with `LEFT JOIN FETCH` to prevent N+1 queries
+- Authorization:
+  - HR admins can assign/modify any manager relationships
+  - Employees can view their own manager (read-only)
+  - Employees can view their own direct reports via `/subordinates` endpoint
 
 ## Search behavior
 
