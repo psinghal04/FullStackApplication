@@ -5,9 +5,15 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.FetchType;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -67,6 +73,15 @@ public class Employee {
 
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
+
+    // Manager relationship: an employee can have a manager (another employee)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "manager_id")
+    private Employee manager;
+
+    // Subordinates: employees managed by this employee
+    @OneToMany(mappedBy = "manager", fetch = FetchType.LAZY)
+    private List<Employee> subordinates = new ArrayList<>();
 
     public UUID getId() {
         return id;
@@ -186,5 +201,21 @@ public class Employee {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Employee getManager() {
+        return manager;
+    }
+
+    public void setManager(Employee manager) {
+        this.manager = manager;
+    }
+
+    public List<Employee> getSubordinates() {
+        return subordinates;
+    }
+
+    public void setSubordinates(List<Employee> subordinates) {
+        this.subordinates = subordinates;
     }
 }
