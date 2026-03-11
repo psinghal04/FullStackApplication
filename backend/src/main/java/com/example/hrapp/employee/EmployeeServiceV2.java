@@ -11,11 +11,13 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -69,13 +71,16 @@ public class EmployeeServiceV2 {
             saved.getLastName()
         );
         keycloakAdminClient.setUserEnabledByEmail(saved.getEmailAddress(), !isTerminated(saved));
-        return employeeMapperV2.toSummaryDTO(saved);
+        
+        // Reload with manager to ensure it's available for DTO mapping
+        Employee reloaded = findByEmployeeIdWithManagerOrThrow(saved.getEmployeeId());
+        return employeeMapperV2.toSummaryDTO(reloaded);
     }
 
     @Transactional(readOnly = true)
     @Cacheable(cacheNames = "employeeDetailsV2", key = "#employeeId")
     public EmployeeDetailsV2DTO getDetailsByEmployeeId(String employeeId) {
-        Employee employee = findByEmployeeIdOrThrow(employeeId);
+        Employee employee = findByEmployeeIdWithManagerOrThrow(employeeId);
         return employeeMapperV2.toDetailsDTO(employee);
     }
 
@@ -109,7 +114,10 @@ public class EmployeeServiceV2 {
 
         Employee saved = employeeRepository.save(employee);
         keycloakAdminClient.setUserEnabledByEmail(saved.getEmailAddress(), !isTerminated(saved));
-        return employeeMapperV2.toSummaryDTO(saved);
+        
+        // Reload with manager to ensure it's available for DTO mapping
+        Employee reloaded = findByEmployeeIdWithManagerOrThrow(saved.getEmployeeId());
+        return employeeMapperV2.toSummaryDTO(reloaded);
     }
 
     /**
@@ -117,7 +125,8 @@ public class EmployeeServiceV2 {
      */
     @Transactional(readOnly = true)
     public List<EmployeeSummaryV2DTO> getSubordinates(String managerEmployeeId) {
-        Employee manager = findByEmployeeIdOrThrow(managerEmployeeId);
+        Employee manager = employeeRepository.findByEmployeeIdWithSubordinates(managerEmployeeId)
+            .orElseThrow(() -> new ResourceNotFoundException("Employee not found for employeeId: " + managerEmployeeId));
         return manager.getSubordinates().stream()
             .map(employeeMapperV2::toSummaryDTO)
             .collect(Collectors.toList());
@@ -132,19 +141,38 @@ public class EmployeeServiceV2 {
             throw new BadRequestException("Either employeeId or lastName must be provided");
         }
 
+        List<Employee> employees;
         if (normalizedEmployeeId != null) {
-            return employeeRepository.findByEmployeeIdIgnoreCase(normalizedEmployeeId, pageable)
-                .map(employeeMapperV2::toSummaryDTO);
+            employees = employeeRepository.findByEmployeeIdIgnoreCaseWithManager(normalizedEmployeeId);
+        } else {
+            employees = employeeRepository.findByLastNameContainingIgnoreCaseWithManager(normalizedLastName);
         }
 
-        return employeeRepository.findByLastNameContainingIgnoreCase(normalizedLastName, pageable)
-            .map(employeeMapperV2::toSummaryDTO);
+        // Sort by lastName, firstName to match original behavior
+        employees.sort(Comparator.comparing(Employee::getLastName)
+            .thenComparing(Employee::getFirstName));
+
+        // Apply pagination manually
+        int start = (int) pageable.getOffset();
+        int end = Math.min(start + pageable.getPageSize(), employees.size());
+        List<Employee> pageContent = employees.subList(start, end);
+
+        List<EmployeeSummaryV2DTO> dtos = pageContent.stream()
+            .map(employeeMapperV2::toSummaryDTO)
+            .collect(Collectors.toList());
+
+        return new PageImpl<>(dtos, pageable, employees.size());
     }
 
     @Transactional(readOnly = true)
     public EmployeeSummaryV2DTO getSummaryByEmployeeId(String employeeId) {
-        Employee employee = findByEmployeeIdOrThrow(employeeId);
+        Employee employee = findByEmployeeIdWithManagerOrThrow(employeeId);
         return employeeMapperV2.toSummaryDTO(employee);
+    }
+
+    private Employee findByEmployeeIdWithManagerOrThrow(String employeeId) {
+        return employeeRepository.findByEmployeeIdWithManager(employeeId)
+            .orElseThrow(() -> new ResourceNotFoundException("Employee not found for employeeId: " + employeeId));
     }
 
     private Employee findByEmployeeIdOrThrow(String employeeId) {

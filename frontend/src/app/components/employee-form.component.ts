@@ -7,12 +7,13 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { EmployeeApiService } from '../api/employee-api.service';
-import { ApiError, EmployeeDetails, EmployeeSummary, EmployeeUpdateRequest } from '../api/employee.models';
+import { ApiError, EmployeeDetailsV2, EmployeeSummaryV2, EmployeeUpdateV2Request, ManagerReference } from '../api/employee.models';
+import { ManagerSelectorComponent } from './manager-selector.component';
 
 @Component({
   selector: 'app-employee-form',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule],
+  imports: [CommonModule, ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatSelectModule, MatButtonModule, MatIconModule, ManagerSelectorComponent],
   template: `
     <form [formGroup]="form" (ngSubmit)="submit()" class="ui-card grid gap-4">
       <div class="grid gap-3 md:grid-cols-2">
@@ -90,6 +91,10 @@ import { ApiError, EmployeeDetails, EmployeeSummary, EmployeeUpdateRequest } fro
           <input matInput type="email" [value]="initialEmailAddress" readonly disabled />
           <mat-hint>Email address is immutable after employee creation.</mat-hint>
         </mat-form-field>
+
+        <div class="md:col-span-2">
+          <app-manager-selector [manager]="selectedManager" (managerChange)="onManagerChange($event)"></app-manager-selector>
+        </div>
       </div>
 
       @if (serverErrorMessage) {
@@ -119,9 +124,9 @@ export class EmployeeFormComponent {
 
   @Input({ required: true }) employeeId!: string;
 
-  @Output() saved = new EventEmitter<EmployeeSummary>();
+  @Output() saved = new EventEmitter<EmployeeSummaryV2>();
 
-  @Input() set employee(value: EmployeeDetails | null) {
+  @Input() set employee(value: EmployeeDetailsV2 | null) {
     if (!value) {
       return;
     }
@@ -142,9 +147,15 @@ export class EmployeeFormComponent {
     });
 
     this.initialEmailAddress = value.emailAddress;
+    this.selectedManager = value.manager;
   }
 
   initialEmailAddress = '';
+  selectedManager: ManagerReference | null = null;
+
+  onManagerChange(manager: ManagerReference | null): void {
+    this.selectedManager = manager;
+  }
 
   readonly form = this.formBuilder.nonNullable.group({
     employeeId: ['', [Validators.required]],
@@ -176,7 +187,7 @@ export class EmployeeFormComponent {
     this.successMessage = null;
 
     const raw = this.form.getRawValue();
-    const payload: EmployeeUpdateRequest = {
+    const payload: EmployeeUpdateV2Request = {
       employeeId: raw.employeeId.trim(),
       firstName: raw.firstName.trim(),
       lastName: raw.lastName.trim(),
@@ -188,10 +199,11 @@ export class EmployeeFormComponent {
       homeAddress: raw.homeAddress.trim(),
       mailingAddress: raw.mailingAddress.trim(),
       telephoneNumber: raw.telephoneNumber.trim(),
-      emailAddress: raw.emailAddress.trim()
+      emailAddress: raw.emailAddress.trim(),
+      managerId: this.selectedManager?.id ?? null
     };
 
-    this.api.updateEmployee(this.employeeId, payload).subscribe({
+    this.api.updateEmployeeV2(this.employeeId, payload).subscribe({
       next: (result) => {
         this.submitting = false;
         this.successMessage = 'Employee updated successfully.';
@@ -204,8 +216,8 @@ export class EmployeeFormComponent {
     });
   }
 
-  isInvalid(controlName: keyof EmployeeUpdateRequest): boolean {
-    const control = this.form.controls[controlName];
-    return control.invalid && (control.dirty || control.touched);
+  isInvalid(controlName: string): boolean {
+    const control = this.form.get(controlName);
+    return control ? control.invalid && (control.dirty || control.touched) : false;
   }
 }
