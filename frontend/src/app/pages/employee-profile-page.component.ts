@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router } from '@angular/router';
 import { EmployeeApiService } from '../api/employee-api.service';
-import { ApiError, EmployeeContactUpdateRequest, EmployeeDetails } from '../api/employee.models';
+import { ApiError, EmployeeContactUpdateRequest, EmployeeDetailsV2, EmployeeSummaryV2 } from '../api/employee.models';
 import { AuthService } from '../auth/auth.service';
 import { ToastService } from '../ui/toast.service';
 
@@ -46,6 +46,15 @@ import { ToastService } from '../ui/toast.service';
           <p><strong>Name:</strong> {{ employee.firstName }} {{ employee.lastName }}</p>
           <p><strong>Job Title:</strong> {{ employee.jobTitle }}</p>
         </section>
+
+        @if (employee.manager) {
+          <section class="ui-card mb-4 space-y-1">
+            <h3 class="text-lg font-semibold">Manager</h3>
+            <p><strong>Employee ID:</strong> {{ employee.manager.employeeId }}</p>
+            <p><strong>Name:</strong> {{ employee.manager.firstName }} {{ employee.manager.lastName }}</p>
+            <p><strong>Job Title:</strong> {{ employee.manager.jobTitle }}</p>
+          </section>
+        }
 
         <form [formGroup]="contactForm" (ngSubmit)="save()" class="ui-card grid gap-4">
           <div class="grid gap-3 md:grid-cols-2">
@@ -92,6 +101,20 @@ import { ToastService } from '../ui/toast.service';
             }
           </div>
         </form>
+
+        @if (subordinates.length > 0) {
+          <section class="ui-card mb-4 space-y-3">
+            <h3 class="text-lg font-semibold">Direct Reports ({{ subordinates.length }})</h3>
+            <div class="space-y-2">
+              @for (report of subordinates; track report.id) {
+                <div class="rounded-md border border-border bg-surface p-3">
+                  <p><strong>{{ report.firstName }} {{ report.lastName }}</strong></p>
+                  <p class="text-sm text-muted">{{ report.employeeId }} - {{ report.jobTitle }}</p>
+                </div>
+              }
+            </div>
+          </section>
+        }
       }
     </section>
   `
@@ -103,7 +126,8 @@ export class EmployeeProfilePageComponent {
   private readonly toastService = inject(ToastService);
   private readonly router = inject(Router);
 
-  employee: EmployeeDetails | null = null;
+  employee: EmployeeDetailsV2 | null = null;
+  subordinates: EmployeeSummaryV2[] = [];
   loadError: string | null = null;
   saving = false;
   isLoading = true;
@@ -117,8 +141,8 @@ export class EmployeeProfilePageComponent {
   constructor() {
     const employeeId = this.authService.getEmployeeId();
     const employeeRequest = employeeId
-      ? this.api.getEmployeeDetails(employeeId)
-      : this.api.getMyEmployeeDetails();
+      ? this.api.getEmployeeDetailsV2(employeeId)
+      : this.api.getMyEmployeeDetailsV2();
 
     employeeRequest.subscribe({
       next: (details) => {
@@ -128,6 +152,17 @@ export class EmployeeProfilePageComponent {
           homeAddress: details.homeAddress,
           mailingAddress: details.mailingAddress,
           telephoneNumber: details.telephoneNumber
+        });
+
+        // Load subordinates
+        this.api.getSubordinates(details.employeeId).subscribe({
+          next: (subs) => {
+            this.subordinates = subs;
+          },
+          error: () => {
+            // Silently fail if subordinates can't be loaded
+            this.subordinates = [];
+          }
         });
       },
       error: (error: { status?: number; error?: ApiError }) => {

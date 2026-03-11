@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { EmployeeApiService } from '../api/employee-api.service';
-import { EmployeeDetails, EmployeeSummary } from '../api/employee.models';
+import { EmployeeDetailsV2, EmployeeSummaryV2 } from '../api/employee.models';
 import { EmployeeFormComponent } from '../components/employee-form.component';
 
 @Component({
@@ -28,12 +28,27 @@ import { EmployeeFormComponent } from '../components/employee-form.component';
       @if (employeeId && employeeDetails) {
         <app-employee-form [employeeId]="employeeId" [employee]="employeeDetails" (saved)="onSaved($event)"></app-employee-form>
       }
+
+      @if (subordinates.length > 0) {
+        <section class="ui-card mb-4 space-y-3">
+          <h3 class="text-lg font-semibold">Direct Reports ({{ subordinates.length }})</h3>
+          <div class="space-y-2">
+            @for (report of subordinates; track report.id) {
+              <div class="rounded-md border border-border bg-surface p-3">
+                <p><strong>{{ report.firstName }} {{ report.lastName }}</strong></p>
+                <p class="text-sm text-muted">{{ report.employeeId }} - {{ report.jobTitle }}</p>
+              </div>
+            }
+          </div>
+        </section>
+      }
     </section>
   `
 })
 export class HrEmployeeDetailsPageComponent {
   readonly employeeId: string | null;
-  employeeDetails: EmployeeDetails | null = null;
+  employeeDetails: EmployeeDetailsV2 | null = null;
+  subordinates: EmployeeSummaryV2[] = [];
   loadError: string | null = null;
   isLoading = true;
 
@@ -43,10 +58,21 @@ export class HrEmployeeDetailsPageComponent {
     this.employeeId = route.snapshot.paramMap.get('employeeId');
 
     if (this.employeeId) {
-      this.api.getEmployeeDetails(this.employeeId).subscribe({
+      this.api.getEmployeeDetailsV2(this.employeeId).subscribe({
         next: (details) => {
           this.isLoading = false;
           this.employeeDetails = details;
+          
+          // Load subordinates
+          this.api.getSubordinates(details.employeeId).subscribe({
+            next: (subs) => {
+              this.subordinates = subs;
+            },
+            error: () => {
+              // Silently fail if subordinates can't be loaded
+              this.subordinates = [];
+            }
+          });
         },
         error: (error: { error?: { message?: string } }) => {
           this.isLoading = false;
@@ -59,7 +85,7 @@ export class HrEmployeeDetailsPageComponent {
     this.isLoading = false;
   }
 
-  onSaved(summary: EmployeeSummary): void {
+  onSaved(summary: EmployeeSummaryV2): void {
     if (this.employeeDetails) {
       this.employeeDetails = {
         ...this.employeeDetails,
@@ -68,7 +94,9 @@ export class HrEmployeeDetailsPageComponent {
         lastName: summary.lastName,
         jobTitle: summary.jobTitle,
         emailAddress: summary.emailAddress,
-        dateOfTermination: summary.dateOfTermination
+        dateOfHire: summary.dateOfHire,
+        dateOfTermination: summary.dateOfTermination,
+        manager: summary.manager
       };
     }
   }

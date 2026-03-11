@@ -128,9 +128,10 @@ public class EmployeeControllerV2 {
      * Returns all employees who report to the specified manager.
      * 
      * <p>New in v2: allows querying the organizational hierarchy.</p>
+     * <p>HR admins can view any employee's subordinates. Employees can view their own subordinates.</p>
      */
     @GetMapping("/{employeeId}/subordinates")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
     public ResponseEntity<List<EmployeeSummaryV2DTO>> getSubordinates(
         @PathVariable String employeeId
     ) {

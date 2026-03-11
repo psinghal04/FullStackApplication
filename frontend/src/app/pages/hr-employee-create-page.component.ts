@@ -9,7 +9,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { Router } from '@angular/router';
 import { EmployeeApiService } from '../api/employee-api.service';
-import { ApiError, EmployeeCreateRequest } from '../api/employee.models';
+import { ApiError, EmployeeCreateV2Request, ManagerReference } from '../api/employee.models';
+import { ManagerSelectorComponent } from '../components/manager-selector.component';
 
 @Component({
   selector: 'app-hr-employee-create-page',
@@ -22,7 +23,8 @@ import { ApiError, EmployeeCreateRequest } from '../api/employee.models';
     MatSelectModule,
     MatButtonModule,
     MatIconModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    ManagerSelectorComponent
   ],
   template: `
     <section class="space-y-4">
@@ -100,6 +102,10 @@ import { ApiError, EmployeeCreateRequest } from '../api/employee.models';
               <mat-error>Valid email address is required.</mat-error>
             }
           </mat-form-field>
+
+          <div class="md:col-span-2">
+            <app-manager-selector (managerChange)="onManagerChange($event)"></app-manager-selector>
+          </div>
         </div>
 
         @if (errorMessage) {
@@ -149,6 +155,11 @@ export class HrEmployeeCreatePageComponent {
   submitting = false;
   errorMessage: string | null = null;
   successMessage: string | null = null;
+  selectedManager: ManagerReference | null = null;
+
+  onManagerChange(manager: ManagerReference | null): void {
+    this.selectedManager = manager;
+  }
 
   create(): void {
     if (this.form.invalid) {
@@ -161,7 +172,7 @@ export class HrEmployeeCreatePageComponent {
     this.successMessage = null;
 
     const raw = this.form.getRawValue();
-    const payload: EmployeeCreateRequest = {
+    const payload: EmployeeCreateV2Request = {
       firstName: raw.firstName.trim(),
       lastName: raw.lastName.trim(),
       jobTitle: raw.jobTitle.trim(),
@@ -172,10 +183,11 @@ export class HrEmployeeCreatePageComponent {
       homeAddress: raw.homeAddress.trim(),
       mailingAddress: raw.mailingAddress.trim(),
       telephoneNumber: raw.telephoneNumber.trim(),
-      emailAddress: raw.emailAddress.trim()
+      emailAddress: raw.emailAddress.trim(),
+      managerId: this.selectedManager?.id ?? null
     };
 
-    this.api.createEmployee(payload).subscribe({
+    this.api.createEmployeeV2(payload).subscribe({
       next: (created) => {
         this.submitting = false;
         this.successMessage = `Employee created: ${created.employeeId}`;
@@ -188,8 +200,8 @@ export class HrEmployeeCreatePageComponent {
     });
   }
 
-  isInvalid(controlName: keyof EmployeeCreateRequest): boolean {
-    const control = this.form.controls[controlName];
-    return control.invalid && (control.dirty || control.touched);
+  isInvalid(controlName: string): boolean {
+    const control = this.form.get(controlName);
+    return control ? control.invalid && (control.dirty || control.touched) : false;
   }
 }
