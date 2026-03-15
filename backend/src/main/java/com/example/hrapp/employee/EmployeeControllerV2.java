@@ -75,11 +75,14 @@ public class EmployeeControllerV2 {
     @PreAuthorize("hasAnyRole('EMPLOYEE','HR_ADMIN')")
     public ResponseEntity<EmployeeDetailsV2DTO> getMyEmployeeProfile(Authentication authentication) {
         Object principal = authentication.getPrincipal();
-        if (!(principal instanceof EmployeeJwtPrincipal employeePrincipal)) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        String employeeId = null;
+
+        if (principal instanceof EmployeeJwtPrincipal jwtPrincipal) {
+            employeeId = jwtPrincipal.employee_id();
+        } else if (principal instanceof com.example.hrapp.auth.BffSessionPrincipal bffPrincipal) {
+            employeeId = bffPrincipal.employeeId();
         }
 
-        String employeeId = employeePrincipal.employee_id();
         if (employeeId == null || employeeId.isBlank()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }

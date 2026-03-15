@@ -5,12 +5,12 @@
 ```mermaid
 flowchart LR
     U[Browser User] --> F[Frontend Angular + Nginx]
-    F -->|OIDC login redirect| K[Keycloak]
-    K -->|JWT access token| F
-    F -->|Bearer token| B[Backend Spring Boot API]
+    F -->|Session cookie BFF_SESSION_ID| B[Backend Spring Boot BFF + API]
+    B -->|Authorization code exchange| K[Keycloak]
+    B -->|Backchannel logout revocation| K
     B -->|Role + employee_id checks| B
     B --> P[(PostgreSQL)]
-    B --> R[(Redis Cache)]
+    B --> R[(Redis — BFF Sessions)]
     B -->|Admin provisioning APIs| K
 
     subgraph Infra
@@ -24,10 +24,10 @@ flowchart LR
 
 ### Component responsibilities
 
-- Frontend: user interface, route guards, token usage, API calls.
-- Backend: business rules, validation, authorization, termination enforcement, data persistence.
+- Frontend: user interface, route guards, session-based API calls (never handles tokens directly).
+- Backend: OAuth2 confidential client (authorization code exchange), BFF session management, business rules, validation, authorization, termination enforcement, data persistence.
 - PostgreSQL: source of truth for employee records.
-- Redis: short-lived read caching for selected employee reads.
+- Redis: BFF session storage (access/refresh tokens, user info, 30-minute TTL); also short-lived employee read cache.
 - Keycloak: identity provider, token issuer, role model, admin provisioning target.
 
 ## 2) API versioning strategy
@@ -334,31 +334,74 @@ Query optimization:
 
 ## 5) Authentication and authorization flow
 
-### Login and token flow
+### Overview
 
-1. User opens frontend.
-2. Frontend redirects to Keycloak for login.
-3. Keycloak returns JWT access token containing roles and `employee_id` claim.
-4. Frontend calls backend with `Authorization: Bearer <token>`.
+The application uses the **Backend-for-Frontend (BFF) pattern** for authentication. The Angular frontend never handles OAuth2 tokens directly. All token exchange and storage is performed server-side. The browser communicates with the backend using an `HttpOnly` session cookie (`BFF_SESSION_ID`).
+
+The backend has a dual security configuration:
+- **OAuth2 Login Client**: handles the authorization code flow and creates BFF sessions.
+- **OAuth2 Resource Server**: validates bearer tokens for direct API access (e.g. machine-to-machine or testing).
+
+### Login flow
+
+1. User opens the frontend. `AuthService.init()` calls `GET /api/auth/csrf` (anonymous) and `GET /api/auth/me`.
+2. No active session → `GET /api/auth/me` returns `401`. Angular routes to `/login`.
+3. `LoginPageComponent.ngOnInit()` immediately redirects to `GET /oauth2/authorization/keycloak`.
+4. Spring Security issues the OAuth2 authorization redirect to Keycloak (PKCE, authorization code flow).
+5. Keycloak authenticates the user and redirects back with an authorization code.
+6. Nginx proxies the callback (`/login/oauth2/code/keycloak`) to the backend.
+7. `BffOAuth2LoginSuccessHandler` exchanges the code for tokens server-to-server, creates a `BffSession` in Redis, and sets the `BFF_SESSION_ID` HttpOnly cookie. Access and refresh tokens never leave the server.
+8. User is redirected to the Angular frontend home page (absolute URL to ensure the browser lands on the nginx port).
+9. Angular re-initializes: `GET /api/auth/me` returns user info resolved from the Redis session.
+10. Route guards allow access to protected routes.
+
+### Logout flow
+
+1. Angular calls `POST /api/auth/logout` (with `X-XSRF-TOKEN` header while CSRF store is still populated).
+2. Backend retrieves the `BffSession` from Redis using the `BFF_SESSION_ID` cookie.
+3. Backend POSTs the stored `refresh_token` to Keycloak's token endpoint (backchannel revocation, server-to-server using the Docker-internal hostname). This terminates the Keycloak SSO session silently.
+4. Backend deletes the Redis session and clears the cookie.
+5. Backend returns `{"logoutUrl": "/login"}`. Angular clears in-memory state and redirects.
+
+### CSRF protection
+
+- `CookieCsrfTokenRepository.withHttpOnlyFalse()` writes a `XSRF-TOKEN` cookie readable by JavaScript.
+- Angular's `CsrfInterceptor` reads the token from the `CsrfTokenStore` (populated at init time from `GET /api/auth/csrf`) and attaches an `X-XSRF-TOKEN` header on every state-changing request.
+- `/api/auth/logout` and the OAuth2 callback paths are excluded from CSRF checks.
 
 ### Role verification in backend
 
-- Backend validates JWT issuer/signature as resource server.
-- `KeycloakJwtAuthenticationConverter` maps `realm_access.roles` to `ROLE_*` authorities.
-- Method-level authorization (`@PreAuthorize`) gates each endpoint.
+- For session-based requests: `BffSessionAuthenticationFilter` validates the `BFF_SESSION_ID` cookie, loads the `BffSession` from Redis, and sets a `BffSessionPrincipal` as the Spring Security principal.
+- For bearer token requests: Spring Security OAuth2 Resource Server validates the JWT; `KeycloakJwtAuthenticationConverter` maps `realm_access.roles` to `ROLE_*` authorities.
+- Method-level authorization (`@PreAuthorize`) gates each endpoint using either principal type.
 
 ### employee_id claim to DB record mapping
 
-- Backend principal includes `employee_id` claim.
-- Ownership rules compare path `employeeId` with `authentication.principal.employee_id`.
-- This prevents employees from reading/updating other employee records.
+- For bearer token auth, the `employee_id` JWT claim is extracted by `KeycloakJwtAuthenticationConverter`.
+- For BFF session auth, `employee_id` is stored in the `BffSession` at login time.
+- `BffOAuth2LoginSuccessHandler.extractEmployeeId()` reads the `employee_id` claim from the OIDC token first; if absent (common for users where the Keycloak mapper is not configured), it falls back to a database lookup by email address.
+- Ownership rules compare the path `employeeId` with `authentication.principal.employee_id` in `@PreAuthorize`.
 
 ### Termination handling
 
-- `TerminatedEmployeeFilter` runs after authentication.
-- It loads employee by `employee_id` and checks `dateOfTermination`.
+- `TerminatedEmployeeFilter` runs after authentication for both principal types.
+- It loads the employee by `employee_id` and checks `dateOfTermination`.
 - If terminated (`<= today`), request is denied with `403` and `reason: terminated`.
-- On terminated requests, filter also attempts `setUserEnabledByEmail(email, false)` so Keycloak account is disabled for future logins.
+- On terminated requests, the filter also attempts `setUserEnabledByEmail(email, false)` to disable the Keycloak account.
+
+### Key new environment variables (BFF)
+
+| Variable | Purpose |
+|---|---|
+| `OAUTH2_CLIENT_ID` | Keycloak client ID for the BFF OAuth2 client |
+| `OAUTH2_CLIENT_SECRET` | Keycloak client secret |
+| `OAUTH2_AUTH_URI` | Keycloak authorization endpoint (browser-facing) |
+| `OAUTH2_TOKEN_URI` | Keycloak token endpoint (internal, for code exchange) |
+| `OAUTH2_REDIRECT_URI` | Redirect URI registered in Keycloak (`http://localhost:4200/login/oauth2/code/keycloak`) |
+| `KEYCLOAK_PUBLIC_ISSUER_URI` | Keycloak issuer URI as seen by the browser |
+| `REDIS_HOST`, `REDIS_PORT` | Redis connection for BFF session storage |
+
+See `infra/docker-compose.yml` for the full set of values used in local development.
 
 ## 6) Deployment notes
 

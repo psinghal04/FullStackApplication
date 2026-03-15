@@ -39,6 +39,9 @@
       "publicClient": true,
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": true,
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:4200/*"
+      },
       "protocolMappers": [
         {
           "name": "employee_id",

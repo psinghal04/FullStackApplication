@@ -48,6 +48,11 @@ resilience4j:
 app:
   cache:
     employee-ttl-seconds: ${EMPLOYEE_CACHE_TTL_SECONDS:60}
+  keycloak:
+    # Public-facing Keycloak URL (browser-accessible). Used to build the RP-Initiated Logout URL.
+    public-issuer-uri: ${KEYCLOAK_PUBLIC_ISSUER_URI:http://localhost:8080/realms/hr}
+    # URI the browser should land on after Keycloak logout completes.
+    post-logout-redirect-uri: ${KEYCLOAK_POST_LOGOUT_REDIRECT_URI:http://localhost:4200/login}
 
 keycloak:
   admin:

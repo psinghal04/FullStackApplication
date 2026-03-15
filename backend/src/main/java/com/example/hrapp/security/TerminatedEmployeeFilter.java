@@ -56,12 +56,19 @@ public class TerminatedEmployeeFilter extends OncePerRequestFilter {
         }
 
         Object principalObj = authentication.getPrincipal();
-        if (!(principalObj instanceof EmployeeJwtPrincipal principal)) {
-            filterChain.doFilter(request, response);
-            return;
+        
+        // Extract employee ID and email from either JWT or BFF session principal
+        String employeeId = null;
+        String email = null;
+        
+        if (principalObj instanceof EmployeeJwtPrincipal jwtPrincipal) {
+            employeeId = jwtPrincipal.employee_id();
+            email = jwtPrincipal.claims().get("email") instanceof String claimEmail ? claimEmail : null;
+        } else if (principalObj instanceof com.example.hrapp.auth.BffSessionPrincipal bffPrincipal) {
+            employeeId = bffPrincipal.employeeId();
+            email = bffPrincipal.email();
         }
 
-        String employeeId = principal.employee_id();
         if (employeeId == null || employeeId.isBlank()) {
             filterChain.doFilter(request, response);
             return;
@@ -73,10 +80,6 @@ public class TerminatedEmployeeFilter extends OncePerRequestFilter {
             .orElse(false);
 
         if (terminated) {
-            String email = principal.claims().get("email") instanceof String claimEmail
-                ? claimEmail
-                : null;
-
             // Best-effort IAM state synchronization for already-terminated accounts.
             if (email != null && !email.isBlank()) {
                 keycloakAdminClient.setUserEnabledByEmail(email, false);
