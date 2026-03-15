@@ -1,8 +1,7 @@
 import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { from, Observable, throwError } from 'rxjs';
-import { switchMap, timeout } from 'rxjs/operators';
-import { AuthService } from '../auth/auth.service';
+import { Observable } from 'rxjs';
+import { timeout } from 'rxjs/operators';
 import {
   EmployeeCreateRequest,
   EmployeeContactUpdateRequest,
@@ -19,7 +18,6 @@ import {
 @Injectable({ providedIn: 'root' })
 export class EmployeeApiService {
   private readonly http = inject(HttpClient);
-  private readonly authService = inject(AuthService);
 
   private readonly apiBaseUrl =
     (window as { __HR_APP_CONFIG__?: { apiBaseUrl?: string } }).__HR_APP_CONFIG__?.apiBaseUrl ??
@@ -130,21 +128,8 @@ export class EmployeeApiService {
   }
 
   private withAuthHeaders<T>(operation: (headers: HttpHeaders) => Observable<T>): Observable<T> {
-    return from(this.authService.getAccessToken()).pipe(
-      switchMap((token) => {
-        if (!token) {
-          return throwError(() => ({
-            status: 401,
-            error: {
-              status: 401,
-              message: 'Session expired. Please sign in again.'
-            }
-          }));
-        }
-
-        const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-        return operation(headers);
-      })
-    );
+    // BFF pattern: authentication is via HttpOnly session cookie, no Bearer token needed.
+    // Cookies are sent automatically by the browser on same-origin requests.
+    return operation(new HttpHeaders());
   }
 }

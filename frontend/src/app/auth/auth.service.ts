@@ -1,26 +1,33 @@
+import { HttpClient } from '@angular/common/http';
 import { inject, Injectable, signal } from '@angular/core';
-import Keycloak, { KeycloakInitOptions } from 'keycloak-js';
-import { KEYCLOAK_INSTANCE } from './keycloak.tokens';
+import { firstValueFrom } from 'rxjs';
+import { CsrfTokenStore } from './csrf-token.store';
 
 export interface CurrentUser {
   username: string;
   roles: string[];
   employeeId: string | null;
+  email: string | null;
 }
 
-interface TokenClaims {
-  preferred_username?: string;
-  realm_access?: {
-    roles?: string[];
-  };
-  employee_id?: string | string[];
+interface BffUserResponse {
+  employeeId: string | null;
+  username: string;
+  email: string | null;
+  roles: string[];
+}
+
+interface CsrfTokenResponse {
+  token: string;
+  headerName: string;
+  parameterName: string;
 }
 
 interface E2EMockAuthConfig {
   username: string;
   roles: string[];
   employeeId: string | null;
-  accessToken?: string;
+  email?: string | null;
 }
 
 interface WindowWithE2EMockAuth {
@@ -30,7 +37,8 @@ interface WindowWithE2EMockAuth {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  private readonly keycloak: Keycloak = inject(KEYCLOAK_INSTANCE);
+  private readonly http = inject(HttpClient);
+  private readonly csrfStore = inject(CsrfTokenStore);
 
   private readonly authenticatedSignal = signal<boolean>(false);
   private readonly currentUserSignal = signal<CurrentUser | null>(null);
@@ -48,7 +56,7 @@ export class AuthService {
         username: 'e2e-user',
         roles: ['HR_ADMIN', 'EMPLOYEE'],
         employeeId: 'EMP-900001',
-        accessToken: 'e2e-mock-token'
+        email: 'e2e-user@company.local'
       };
     }
     return null;
@@ -60,45 +68,84 @@ export class AuthService {
       this.currentUserSignal.set({
         username: this.e2eMockAuth.username,
         roles: this.e2eMockAuth.roles,
-        employeeId: this.e2eMockAuth.employeeId
+        employeeId: this.e2eMockAuth.employeeId,
+        email: this.e2eMockAuth.email ?? null
       });
       return;
     }
 
-    const initOptions: KeycloakInitOptions = {
-      onLoad: 'check-sso',
-      pkceMethod: 'S256',
-      checkLoginIframe: false
-    };
+    // Fetch CSRF token
+    try {
+      const csrfResponse = await firstValueFrom(
+        this.http.get<CsrfTokenResponse>('/api/auth/csrf')
+      );
+      this.csrfStore.setToken(csrfResponse.token, csrfResponse.headerName);
+    } catch (error) {
+      console.error('Failed to fetch CSRF token:', error);
+    }
 
-    const isAuthenticated = await this.keycloak.init(initOptions);
-    this.authenticatedSignal.set(isAuthenticated);
-    this.setCurrentUserFromToken();
+    // Check if user is authenticated
+    try {
+      const userResponse = await firstValueFrom(
+        this.http.get<BffUserResponse>('/api/auth/me')
+      );
+      this.authenticatedSignal.set(true);
+      this.currentUserSignal.set({
+        username: userResponse.username,
+        roles: userResponse.roles,
+        employeeId: userResponse.employeeId,
+        email: userResponse.email
+      });
+    } catch {
+      // Not authenticated - this is expected for unauthenticated users
+      this.authenticatedSignal.set(false);
+      this.currentUserSignal.set(null);
+    }
+  }
 
-    if (isAuthenticated) {
-      await this.keycloak.updateToken(30).catch(() => {
+  login(redirectUri?: string): void {
+    if (this.e2eMockAuth) {
+      return;
+    }
+    // Navigate directly to OAuth2 authorization endpoint, bypassing /api/auth/login
+    // to avoid redirect loop caused by Spring Security's loginPage configuration
+    window.location.href = '/oauth2/authorization/keycloak';
+  }
+
+  async logout(): Promise<void> {
+    if (this.e2eMockAuth) {
+      this.authenticatedSignal.set(false);
+      this.currentUserSignal.set(null);
+      this.csrfStore.clearToken();
+      return Promise.resolve();
+    }
+
+    try {
+      // Send CSRF token BEFORE clearing it — the interceptor reads it from the store.
+      const result = await firstValueFrom(
+        this.http.post<{ logoutUrl: string }>('/api/auth/logout', {})
+      );
+      // Redirect to Keycloak's end_session endpoint to terminate the SSO session.
+      // Without this, Keycloak auto-signs the user back in on the next page load.
+      const keycloakLogoutUrl = result?.logoutUrl;
+      if (keycloakLogoutUrl) {
         this.authenticatedSignal.set(false);
         this.currentUserSignal.set(null);
-      });
+        this.csrfStore.clearToken();
+        window.location.href = keycloakLogoutUrl;
+        return;
+      }
+    } catch (error) {
+      console.error('Logout failed:', error);
     }
-  }
 
-  login(redirectUri?: string): Promise<void> {
-    if (this.e2eMockAuth) {
-      return Promise.resolve();
-    }
-    return this.keycloak.login({ redirectUri }) as Promise<void>;
-  }
-
-  logout(): Promise<void> {
+    // Clear in-memory state after the server call (token needed for the POST above).
     this.authenticatedSignal.set(false);
     this.currentUserSignal.set(null);
+    this.csrfStore.clearToken();
 
-    if (this.e2eMockAuth) {
-      return Promise.resolve();
-    }
-
-    return this.keycloak.logout({ redirectUri: window.location.origin + '/login' }) as Promise<void>;
+    // Redirect to login page
+    window.location.href = '/login';
   }
 
   hasRole(role: string): boolean {
@@ -109,73 +156,12 @@ export class AuthService {
     return this.currentUserSignal()?.employeeId ?? null;
   }
 
+  /**
+   * @deprecated Access tokens are no longer exposed in BFF pattern.
+   * Authentication is handled via HttpOnly session cookies.
+   */
   async getAccessToken(): Promise<string | null> {
-    if (this.e2eMockAuth) {
-      return this.e2eMockAuth.accessToken ?? 'e2e-mock-token';
-    }
-
-    if (!this.authenticatedSignal()) {
-      return null;
-    }
-
-    const currentToken = this.keycloak.token ?? null;
-    if (!currentToken) {
-      return null;
-    }
-
-    try {
-      await this.keycloak.updateToken(30);
-    } catch {
-      return currentToken;
-    }
-
-    return this.keycloak.token ?? currentToken;
-  }
-
-  private setCurrentUserFromToken(): void {
-    const claims = (this.keycloak.tokenParsed ?? {}) as TokenClaims;
-    const roles = claims.realm_access?.roles ?? [];
-
-    if (!this.authenticatedSignal()) {
-      this.currentUserSignal.set(null);
-      return;
-    }
-
-    this.currentUserSignal.set({
-      username: claims.preferred_username ?? 'unknown',
-      roles,
-      employeeId: this.extractEmployeeId(claims)
-    });
-  }
-
-  private extractEmployeeId(claims: TokenClaims): string | null {
-    if (typeof claims.employee_id === 'string' && claims.employee_id.trim().length > 0) {
-      return claims.employee_id;
-    }
-
-    if (Array.isArray(claims.employee_id)) {
-      const firstId = claims.employee_id.find((value) => typeof value === 'string' && value.trim().length > 0);
-      if (firstId) {
-        return firstId.trim();
-      }
-    }
-
-    const preferredUsername = claims.preferred_username?.trim();
-    if (!preferredUsername) {
-      return null;
-    }
-
-    const atIndex = preferredUsername.indexOf('@');
-    const candidate = (atIndex > 0 ? preferredUsername.slice(0, atIndex) : preferredUsername).trim();
-
-    if (!candidate || !candidate.includes('-')) {
-      return null;
-    }
-
-    if (!/^[a-zA-Z0-9-]+$/.test(candidate)) {
-      return null;
-    }
-
-    return candidate.toUpperCase();
+    console.warn('getAccessToken() is deprecated in BFF pattern - authentication uses session cookies');
+    return null;
   }
 }

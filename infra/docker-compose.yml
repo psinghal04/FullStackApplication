@@ -48,6 +48,8 @@ services:
       KC_DB_USERNAME: hr
       KC_DB_PASSWORD: hr
       KC_HOSTNAME: localhost
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_BACKCHANNEL: "false"
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KEYCLOAK_ADMIN: admin
@@ -94,8 +96,15 @@ services:
       SPRING_DATASOURCE_PASSWORD: hr
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/hr
+      KEYCLOAK_ISSUER_URI: http://keycloak:8080/realms/hr
       KEYCLOAK_JWK_SET_URI: http://keycloak:8080/realms/hr/protocol/openid-connect/certs
+      OAUTH2_CLIENT_ID: hr-frontend
+      OAUTH2_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET:-}
+      OAUTH2_REDIRECT_URI: http://localhost:4200/login/oauth2/code/keycloak
+      OAUTH2_AUTHORIZATION_URI: http://localhost:8080/realms/hr/protocol/openid-connect/auth
+      OAUTH2_TOKEN_URI: http://keycloak:8080/realms/hr/protocol/openid-connect/token
+      OAUTH2_USER_INFO_URI: http://keycloak:8080/realms/hr/protocol/openid-connect/userinfo
+      OAUTH2_JWK_SET_URI: http://keycloak:8080/realms/hr/protocol/openid-connect/certs
       KEYCLOAK_ADMIN_SERVER_URL: http://keycloak:8080
       KEYCLOAK_ADMIN_REALM: hr
       KEYCLOAK_ADMIN_CLIENT_ID: hr-admin-client
