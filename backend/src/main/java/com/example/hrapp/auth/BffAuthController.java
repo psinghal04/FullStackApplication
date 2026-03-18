@@ -22,8 +22,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Optional;
 
@@ -35,13 +33,10 @@ import java.util.Optional;
 @RequestMapping("/api/auth")
 public class BffAuthController {
     private static final Logger log = LoggerFactory.getLogger(BffAuthController.class);
-    private static final String SESSION_COOKIE_NAME = "BFF_SESSION_ID";
 
     private final BffSessionService sessionService;
+    private final RequestOriginResolver requestOriginResolver;
     private final RestTemplate restTemplate = new RestTemplate();
-
-    @Value("${app.keycloak.public-issuer-uri:http://localhost:8080/realms/hr}")
-    private String keycloakPublicIssuerUri;
 
     /** Internal (Docker service name) Keycloak base URL for server-to-server calls. */
     @Value("${app.keycloak.internal-issuer-uri:${KEYCLOAK_ISSUER_URI:http://keycloak:8080/realms/hr}}")
@@ -50,8 +45,9 @@ public class BffAuthController {
     @Value("${oauth2.client-id:hr-frontend}")
     private String oauthClientId;
 
-    public BffAuthController(BffSessionService sessionService) {
+    public BffAuthController(BffSessionService sessionService, RequestOriginResolver requestOriginResolver) {
         this.sessionService = sessionService;
+        this.requestOriginResolver = requestOriginResolver;
     }
 
     /**
@@ -132,7 +128,7 @@ public class BffAuthController {
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {
-                if (SESSION_COOKIE_NAME.equals(cookie.getName())) {
+                if (AuthConstants.SESSION_COOKIE_NAME.equals(cookie.getName())) {
                     String sessionId = cookie.getValue();
 
                     // Load session BEFORE revoking so we can use its refresh token
@@ -140,7 +136,7 @@ public class BffAuthController {
                     sessionService.revokeSession(sessionId);
 
                     // Clear BFF_SESSION_ID cookie in the browser
-                    Cookie clearCookie = new Cookie(SESSION_COOKIE_NAME, null);
+                    Cookie clearCookie = new Cookie(AuthConstants.SESSION_COOKIE_NAME, null);
                     clearCookie.setHttpOnly(true);
                     clearCookie.setSecure(false);
                     clearCookie.setPath("/");
@@ -201,20 +197,12 @@ public class BffAuthController {
         HttpServletResponse response,
         HttpServletRequest request
     ) throws java.io.IOException {
-        if (request.getParameterMap().containsKey("error")) {
+        if (error != null) {
             response.sendRedirect("/login?authError=1");
             return;
         }
 
-        // Use absolute URL to ensure correct redirect through nginx proxy
-        String scheme = request.getHeader("X-Forwarded-Proto") != null 
-            ? request.getHeader("X-Forwarded-Proto") 
-            : request.getScheme();
-        String host = request.getHeader("X-Forwarded-Host") != null 
-            ? request.getHeader("X-Forwarded-Host") 
-            : request.getHeader("Host");
-        
-        String redirectUrl = scheme + "://" + host + "/oauth2/authorization/keycloak";
+        String redirectUrl = requestOriginResolver.resolveBaseUrl(request) + AuthConstants.LOGIN_REDIRECT_PATH;
         response.sendRedirect(redirectUrl);
     }
 }

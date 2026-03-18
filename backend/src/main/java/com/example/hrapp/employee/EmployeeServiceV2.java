@@ -138,7 +138,7 @@ public class EmployeeServiceV2 {
         String normalizedLastName = normalize(partialLastName);
 
         if (normalizedEmployeeId == null && normalizedLastName == null) {
-            throw new BadRequestException("Either employeeId or lastName must be provided");
+            throw new BadRequestException(EmployeeConstants.EMPLOYEE_SEARCH_CRITERIA_REQUIRED_MESSAGE);
         }
 
         List<Employee> employees;
@@ -206,14 +206,14 @@ public class EmployeeServiceV2 {
 
     private void ensureEmailAddressIsUnchanged(String requestedEmailAddress, String currentEmailAddress) {
         if (!requestedEmailAddress.equalsIgnoreCase(currentEmailAddress)) {
-            throw new BadRequestException("emailAddress cannot be changed once created");
+            throw new BadRequestException(EmployeeConstants.EMAIL_ADDRESS_IMMUTABLE_MESSAGE);
         }
     }
 
     private String generateEmployeeId() {
         for (int attempts = 0; attempts < 20; attempts++) {
             int value = ThreadLocalRandom.current().nextInt(1, 1_000_000);
-            String candidate = "EMP-" + String.format("%06d", value);
+            String candidate = EmployeeConstants.EMPLOYEE_ID_PREFIX + String.format("%06d", value);
             if (!employeeRepository.existsByEmployeeId(candidate)) {
                 return candidate;
             }

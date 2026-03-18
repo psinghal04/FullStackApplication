@@ -49,7 +49,7 @@ public class EmployeeController {
      * Creates a new employee and triggers identity provisioning.
      */
     @PostMapping
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<EmployeeSummaryDTO> createEmployee(
         @Valid @RequestBody EmployeeCreateDTO request
     ) {
@@ -61,7 +61,7 @@ public class EmployeeController {
      * Returns an employee profile for HR admins or the owning employee.
      */
     @GetMapping("/{employeeId}")
-    @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_OR_SELF)
     public ResponseEntity<EmployeeDetailsDTO> getEmployeeByPathEmployeeId(
         @PathVariable String employeeId
     ) {
@@ -72,7 +72,7 @@ public class EmployeeController {
      * Convenience endpoint to resolve the caller's own profile.
      */
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('EMPLOYEE','HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.EMPLOYEE_OR_HR_ADMIN)
     public ResponseEntity<EmployeeDetailsDTO> getMyEmployeeProfile(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         if (!(principal instanceof EmployeeJwtPrincipal employeePrincipal)) {
@@ -91,7 +91,7 @@ public class EmployeeController {
      * Full update endpoint for HR admins.
      */
     @PutMapping("/{employeeId}")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<EmployeeSummaryDTO> updateEmployee(
         @PathVariable String employeeId,
         @Valid @RequestBody EmployeeUpdateDTO request
@@ -103,7 +103,7 @@ public class EmployeeController {
      * Partial contact update endpoint for HR admins and owning employees.
      */
     @PatchMapping("/{employeeId}/contact")
-    @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_OR_SELF)
     public ResponseEntity<EmployeeSummaryDTO> updateEmployeeContact(
         @PathVariable String employeeId,
         @Valid @RequestBody EmployeeContactUpdateDTO request
@@ -117,7 +117,7 @@ public class EmployeeController {
      * <p>If both parameters are supplied, {@code employeeId} takes precedence.</p>
      */
     @GetMapping("/search")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<Page<EmployeeSummaryDTO>> searchEmployees(
         @RequestParam(value = "employeeId", required = false) String employeeId,
         @RequestParam(value = "lastName", required = false) String lastName,
@@ -129,7 +129,7 @@ public class EmployeeController {
     }
 
     @GetMapping(params = "employeeId")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<EmployeeSummaryDTO> getByEmployeeId(
         @RequestParam("employeeId") @NotBlank String employeeId
     ) {

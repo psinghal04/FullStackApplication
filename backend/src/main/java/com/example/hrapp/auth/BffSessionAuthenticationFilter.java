@@ -19,8 +19,6 @@ import java.util.Optional;
  */
 @Component
 public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
-    private static final String SESSION_COOKIE_NAME = "BFF_SESSION_ID";
-
     private final BffSessionService sessionService;
 
     public BffSessionAuthenticationFilter(BffSessionService sessionService) {
@@ -72,7 +70,7 @@ public class BffSessionAuthenticationFilter extends OncePerRequestFilter {
         }
 
         for (Cookie cookie : cookies) {
-            if (SESSION_COOKIE_NAME.equals(cookie.getName())) {
+            if (AuthConstants.SESSION_COOKIE_NAME.equals(cookie.getName())) {
                 return Optional.of(cookie.getValue());
             }
         }

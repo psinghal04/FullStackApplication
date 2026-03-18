@@ -15,8 +15,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -31,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EmployeeServiceSearchTest {
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-18T12:00:00Z"), ZoneOffset.UTC);
 
     @Mock
     private EmployeeRepository employeeRepository;
@@ -54,7 +58,7 @@ class EmployeeServiceSearchTest {
         );
 
         keycloakAdminClient = new RecordingKeycloakAdminClient(properties);
-        employeeService = new EmployeeService(employeeRepository, employeeMapper, keycloakAdminClient);
+        employeeService = new EmployeeService(employeeRepository, employeeMapper, keycloakAdminClient, FIXED_CLOCK);
     }
 
     @Test
@@ -131,7 +135,7 @@ class EmployeeServiceSearchTest {
 
         assertThatThrownBy(() -> employeeService.searchEmployees("   ", "   ", pageable))
             .isInstanceOf(BadRequestException.class)
-            .hasMessage("Either employeeId or lastName must be provided");
+            .hasMessage(EmployeeConstants.EMPLOYEE_SEARCH_CRITERIA_REQUIRED_MESSAGE);
 
         verify(employeeRepository, never()).findByEmployeeIdIgnoreCase(any(String.class), eq(pageable));
         verify(employeeRepository, never()).findByLastNameContainingIgnoreCase(any(String.class), eq(pageable));
@@ -159,7 +163,7 @@ class EmployeeServiceSearchTest {
 
         assertThatThrownBy(() -> employeeService.updateByEmployeeId("EMP-000201", request))
             .isInstanceOf(BadRequestException.class)
-            .hasMessage("emailAddress cannot be changed once created");
+            .hasMessage(EmployeeConstants.EMAIL_ADDRESS_IMMUTABLE_MESSAGE);
 
         verify(employeeRepository, never()).save(any(Employee.class));
     }
@@ -178,7 +182,7 @@ class EmployeeServiceSearchTest {
 
         assertThatThrownBy(() -> employeeService.patchContactByEmployeeId("EMP-000202", request))
             .isInstanceOf(BadRequestException.class)
-            .hasMessage("emailAddress cannot be changed once created");
+            .hasMessage(EmployeeConstants.EMAIL_ADDRESS_IMMUTABLE_MESSAGE);
 
         verify(employeeRepository, never()).save(any(Employee.class));
     }
@@ -201,13 +205,28 @@ class EmployeeServiceSearchTest {
     @Test
     void updateByEmployeeId_enablesKeycloakUser_whenDateOfTerminationRemoved() {
         Employee existingEmployee = employee("EMP-000402", "Jane", "Doe");
-        existingEmployee.setDateOfTermination(LocalDate.now().minusDays(2));
+        existingEmployee.setDateOfTermination(LocalDate.now(FIXED_CLOCK).minusDays(2));
         when(employeeRepository.findByEmployeeId("EMP-000402")).thenReturn(java.util.Optional.of(existingEmployee));
         when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         EmployeeUpdateDTO request = buildUpdateRequest(existingEmployee, null);
 
         employeeService.updateByEmployeeId("EMP-000402", request);
+
+        assertThat(keycloakAdminClient.enableSyncCalls)
+            .containsExactly(new EnableSyncCall(existingEmployee.getEmailAddress(), true));
+    }
+
+    @Test
+    void updateByEmployeeId_keepsKeycloakUserEnabled_whenTerminationDateIsInFuture() {
+        Employee existingEmployee = employee("EMP-000403", "Taylor", "Doe");
+        existingEmployee.setDateOfTermination(null);
+        when(employeeRepository.findByEmployeeId("EMP-000403")).thenReturn(java.util.Optional.of(existingEmployee));
+        when(employeeRepository.save(any(Employee.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        EmployeeUpdateDTO request = buildUpdateRequest(existingEmployee, LocalDate.now(FIXED_CLOCK).plusDays(1));
+
+        employeeService.updateByEmployeeId("EMP-000403", request);
 
         assertThat(keycloakAdminClient.enableSyncCalls)
             .containsExactly(new EnableSyncCall(existingEmployee.getEmailAddress(), true));

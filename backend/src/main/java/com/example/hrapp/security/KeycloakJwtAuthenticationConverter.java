@@ -55,7 +55,7 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
         return Optional.ofNullable(readEmployeeIdClaim(jwt))
             .filter(Predicate.not(String::isBlank))
             // Compatibility fallback: derive from username prefix if it looks like EMP-xxxx.
-            .or(() -> Optional.ofNullable(deriveEmployeeIdFromUsername(jwt.getClaimAsString("preferred_username"))))
+            .or(() -> Optional.ofNullable(deriveEmployeeIdFromUsername(jwt.getClaimAsString(JwtClaimNames.PREFERRED_USERNAME))))
             // Final fallback for legacy principals: map email to employee record.
             .or(() -> Optional.ofNullable(readEmployeeIdFromEmail(jwt))
                 .filter(Predicate.not(String::isBlank)))
@@ -63,7 +63,7 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
     }
 
     private String readEmployeeIdClaim(Jwt jwt) {
-        Object claim = jwt.getClaim("employee_id");
+        Object claim = jwt.getClaim(JwtClaimNames.EMPLOYEE_ID);
         if (claim instanceof String claimValue) {
             return claimValue.trim();
         }
@@ -81,7 +81,7 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
 
     private String readEmployeeIdFromEmail(Jwt jwt) {
         try {
-            return Optional.ofNullable(jwt.getClaimAsString("email"))
+            return Optional.ofNullable(jwt.getClaimAsString(JwtClaimNames.EMAIL))
                 .map(String::trim)
                 .filter(Predicate.not(String::isBlank))
                 .flatMap(employeeRepository::findByEmailAddressIgnoreCase)
@@ -89,7 +89,7 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
                 .orElse(null);
         } catch (RuntimeException exception) {
             String subject = jwt.getSubject();
-            Object rawEmail = jwt.getClaims().get("email");
+            Object rawEmail = jwt.getClaims().get(JwtClaimNames.EMAIL);
             log.warn("Failed to resolve employeeId by email fallback for subject={} email={}", subject, rawEmail, exception);
             return null;
         }
@@ -118,12 +118,12 @@ public class KeycloakJwtAuthenticationConverter implements Converter<Jwt, Abstra
     }
 
     private Collection<? extends GrantedAuthority> extractRealmRoles(Jwt jwt) {
-        Object realmAccessObj = jwt.getClaim("realm_access");
+        Object realmAccessObj = jwt.getClaim(JwtClaimNames.REALM_ACCESS);
         if (!(realmAccessObj instanceof Map<?, ?> realmAccessMap)) {
             return Set.of();
         }
 
-        Object rolesObj = realmAccessMap.get("roles");
+        Object rolesObj = realmAccessMap.get(JwtClaimNames.ROLES);
         if (!(rolesObj instanceof Collection<?> roles)) {
             return Set.of();
         }

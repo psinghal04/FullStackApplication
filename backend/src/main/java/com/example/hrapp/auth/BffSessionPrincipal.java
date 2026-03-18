@@ -1,5 +1,6 @@
 package com.example.hrapp.auth;
 
+import com.example.hrapp.security.JwtClaimNames;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -27,10 +28,10 @@ public class BffSessionPrincipal implements OAuth2User {
     @Override
     public Map<String, Object> getAttributes() {
         return Map.of(
-            "employee_id", session.employeeId() != null ? session.employeeId() : "",
+            JwtClaimNames.EMPLOYEE_ID, session.employeeId() != null ? session.employeeId() : "",
             "username", session.username(),
-            "email", session.email() != null ? session.email() : "",
-            "roles", session.roles()
+            JwtClaimNames.EMAIL, session.email() != null ? session.email() : "",
+            JwtClaimNames.ROLES, session.roles()
         );
     }
 

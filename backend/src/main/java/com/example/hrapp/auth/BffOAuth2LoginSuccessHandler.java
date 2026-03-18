@@ -1,6 +1,7 @@
 package com.example.hrapp.auth;
 
 import com.example.hrapp.employee.EmployeeRepository;
+import com.example.hrapp.security.JwtClaimNames;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -26,24 +27,26 @@ import java.util.Map;
  */
 @Component
 public class BffOAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
-    private static final String SESSION_COOKIE_NAME = "BFF_SESSION_ID";
     private static final int COOKIE_MAX_AGE = 30 * 60; // 30 minutes
 
     private final BffSessionService sessionService;
     private final OAuth2AuthorizedClientService authorizedClientService;
     private final ObjectMapper objectMapper;
     private final EmployeeRepository employeeRepository;
+    private final RequestOriginResolver requestOriginResolver;
 
     public BffOAuth2LoginSuccessHandler(
         BffSessionService sessionService,
         OAuth2AuthorizedClientService authorizedClientService,
         ObjectMapper objectMapper,
-        EmployeeRepository employeeRepository
+        EmployeeRepository employeeRepository,
+        RequestOriginResolver requestOriginResolver
     ) {
         this.sessionService = sessionService;
         this.authorizedClientService = authorizedClientService;
         this.objectMapper = objectMapper;
         this.employeeRepository = employeeRepository;
+        this.requestOriginResolver = requestOriginResolver;
     }
 
     @Override
@@ -107,19 +110,11 @@ public class BffOAuth2LoginSuccessHandler implements AuthenticationSuccessHandle
         // Use addHeader (not setHeader) so we do NOT replace any JSESSIONID cookie that
         // Spring Security's session fixation protection already wrote to the response.
         String cookieValue = String.format("%s=%s; Path=/; HttpOnly; Max-Age=%d; SameSite=Lax",
-            SESSION_COOKIE_NAME, session.sessionId(), COOKIE_MAX_AGE);
+            AuthConstants.SESSION_COOKIE_NAME, session.sessionId(), COOKIE_MAX_AGE);
         response.addHeader("Set-Cookie", cookieValue);
 
-        // Redirect to frontend home page
-        String scheme = request.getHeader("X-Forwarded-Proto") != null 
-            ? request.getHeader("X-Forwarded-Proto") 
-            : request.getScheme();
-        String host = request.getHeader("X-Forwarded-Host") != null 
-            ? request.getHeader("X-Forwarded-Host") 
-            : request.getHeader("Host");
-        
         // Redirect to employee profile page to avoid additional redirect from root
-        String redirectUrl = scheme + "://" + host + "/employee/profile";
+        String redirectUrl = requestOriginResolver.resolveBaseUrl(request) + AuthConstants.EMPLOYEE_PROFILE_PATH;
         response.sendRedirect(redirectUrl);
     }
 
@@ -132,7 +127,7 @@ public class BffOAuth2LoginSuccessHandler implements AuthenticationSuccessHandle
 
     private String extractEmployeeId(OAuth2User oauth2User) {
         // Try to get employee_id claim from userinfo attributes
-        Object employeeId = oauth2User.getAttribute("employee_id");
+        Object employeeId = oauth2User.getAttribute(JwtClaimNames.EMPLOYEE_ID);
         if (employeeId != null) {
             return employeeId.toString();
         }
@@ -158,8 +153,8 @@ public class BffOAuth2LoginSuccessHandler implements AuthenticationSuccessHandle
             if (parts.length < 2) return List.of();
             String payload = new String(Base64.getUrlDecoder().decode(parts[1]));
             Map<String, Object> claims = objectMapper.readValue(payload, new TypeReference<>() {});
-            Object realmAccess = claims.get("realm_access");
-            if (realmAccess instanceof Map<?, ?> ra && ra.get("roles") instanceof List<?> roleList) {
+            Object realmAccess = claims.get(JwtClaimNames.REALM_ACCESS);
+            if (realmAccess instanceof Map<?, ?> ra && ra.get(JwtClaimNames.ROLES) instanceof List<?> roleList) {
                 return roleList.stream()
                         .filter(r -> r instanceof String)
                         .map(r -> (String) r)

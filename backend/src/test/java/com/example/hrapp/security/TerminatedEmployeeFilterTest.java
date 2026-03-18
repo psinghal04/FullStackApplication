@@ -22,6 +22,8 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.Optional;
 
+import static com.example.hrapp.security.JwtClaimNames.EMAIL;
+import static com.example.hrapp.security.JwtClaimNames.EMPLOYEE_ID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
@@ -52,7 +54,7 @@ class TerminatedEmployeeFilterTest {
         EmployeeJwtPrincipal principal = new EmployeeJwtPrincipal(
             employeeId,
             "sub-1",
-            Map.of("employee_id", employeeId, "email", "john.doe@example.com")
+            Map.of(EMPLOYEE_ID, employeeId, EMAIL, "john.doe@example.com")
         );
         UsernamePasswordAuthenticationToken authentication =
             new UsernamePasswordAuthenticationToken(principal, "token", java.util.List.of());
@@ -86,7 +88,7 @@ class TerminatedEmployeeFilterTest {
 
         when(employeeRepository.findByEmployeeId(eq(employeeId))).thenReturn(Optional.of(activeEmployee));
 
-        EmployeeJwtPrincipal principal = new EmployeeJwtPrincipal(employeeId, "sub-2", Map.of("employee_id", employeeId));
+        EmployeeJwtPrincipal principal = new EmployeeJwtPrincipal(employeeId, "sub-2", Map.of(EMPLOYEE_ID, employeeId));
         UsernamePasswordAuthenticationToken authentication =
             new UsernamePasswordAuthenticationToken(principal, "token", java.util.List.of());
         SecurityContextHolder.getContext().setAuthentication(authentication);

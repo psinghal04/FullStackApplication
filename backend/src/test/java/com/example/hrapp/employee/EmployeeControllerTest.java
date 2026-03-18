@@ -8,6 +8,7 @@ import com.example.hrapp.employee.dto.EmployeeSummaryDTO;
 import com.example.hrapp.identity.KeycloakAdminClient;
 import com.example.hrapp.identity.KeycloakAdminProperties;
 import com.example.hrapp.security.EmployeeJwtPrincipal;
+import com.example.hrapp.security.JwtClaimNames;
 import com.example.hrapp.security.TerminatedEmployeeFilter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -21,7 +22,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class EmployeeControllerTest {
+    private static final Clock FIXED_CLOCK = Clock.fixed(Instant.parse("2026-03-18T12:00:00Z"), ZoneOffset.UTC);
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -44,7 +49,7 @@ class EmployeeControllerTest {
         objectMapper = new ObjectMapper().findAndRegisterModules();
         employeeRepository = Mockito.mock(EmployeeRepository.class);
 
-        EmployeeService service = new EmployeeService(null, null, null) {
+        EmployeeService service = new EmployeeService(null, null, null, FIXED_CLOCK) {
             @Override
             public EmployeeSummaryDTO create(EmployeeCreateDTO request) {
                 return new EmployeeSummaryDTO(
@@ -201,7 +206,7 @@ class EmployeeControllerTest {
     }
 
     private void setAuthenticatedPrincipal(String employeeId, String... roles) {
-        EmployeeJwtPrincipal principal = new EmployeeJwtPrincipal(employeeId, "sub-" + employeeId, Map.of("employee_id", employeeId));
+        EmployeeJwtPrincipal principal = new EmployeeJwtPrincipal(employeeId, "sub-" + employeeId, Map.of(JwtClaimNames.EMPLOYEE_ID, employeeId));
         List<SimpleGrantedAuthority> authorities = java.util.Arrays.stream(roles)
             .map(SimpleGrantedAuthority::new)
             .toList();

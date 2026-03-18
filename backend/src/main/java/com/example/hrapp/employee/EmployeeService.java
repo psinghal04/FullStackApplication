@@ -16,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.UUID;
@@ -32,15 +33,18 @@ public class EmployeeService {
     private final EmployeeRepository employeeRepository;
     private final EmployeeMapper employeeMapper;
     private final KeycloakAdminClient keycloakAdminClient;
+    private final Clock clock;
 
     public EmployeeService(
         EmployeeRepository employeeRepository,
         EmployeeMapper employeeMapper,
-        KeycloakAdminClient keycloakAdminClient
+        KeycloakAdminClient keycloakAdminClient,
+        Clock clock
     ) {
         this.employeeRepository = employeeRepository;
         this.employeeMapper = employeeMapper;
         this.keycloakAdminClient = keycloakAdminClient;
+        this.clock = clock;
     }
 
     /**
@@ -122,7 +126,7 @@ public class EmployeeService {
         String normalizedLastName = normalize(partialLastName);
 
         if (normalizedEmployeeId == null && normalizedLastName == null) {
-            throw new BadRequestException("Either employeeId or lastName must be provided");
+            throw new BadRequestException(EmployeeConstants.EMPLOYEE_SEARCH_CRITERIA_REQUIRED_MESSAGE);
         }
 
         if (normalizedEmployeeId != null) {
@@ -167,13 +171,13 @@ public class EmployeeService {
 
     private void ensureEmailAddressIsUnchanged(String requestedEmailAddress, String currentEmailAddress) {
         if (!requestedEmailAddress.equalsIgnoreCase(currentEmailAddress)) {
-            throw new BadRequestException("emailAddress cannot be changed once created");
+            throw new BadRequestException(EmployeeConstants.EMAIL_ADDRESS_IMMUTABLE_MESSAGE);
         }
     }
 
     private void ensureEmailAddressNotProvidedInContactPatch(EmployeeContactUpdateDTO request) {
         if (request.emailAddress() != null) {
-            throw new BadRequestException("emailAddress cannot be changed once created");
+            throw new BadRequestException(EmployeeConstants.EMAIL_ADDRESS_IMMUTABLE_MESSAGE);
         }
     }
 
@@ -181,7 +185,7 @@ public class EmployeeService {
         // Random bounded retries balance uniqueness with predictable latency.
         for (int attempts = 0; attempts < 20; attempts++) {
             int value = ThreadLocalRandom.current().nextInt(1, 1_000_000);
-            String candidate = "EMP-" + String.format("%06d", value);
+            String candidate = EmployeeConstants.EMPLOYEE_ID_PREFIX + String.format("%06d", value);
             if (!employeeRepository.existsByEmployeeId(candidate)) {
                 return candidate;
             }
@@ -195,6 +199,6 @@ public class EmployeeService {
             return false;
         }
 
-        return !employee.getDateOfTermination().isAfter(LocalDate.now());
+        return !employee.getDateOfTermination().isAfter(LocalDate.now(clock));
     }
 }

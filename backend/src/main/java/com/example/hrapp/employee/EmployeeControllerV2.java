@@ -49,7 +49,7 @@ public class EmployeeControllerV2 {
      * Creates a new employee with optional manager assignment.
      */
     @PostMapping
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<EmployeeSummaryV2DTO> createEmployee(
         @Valid @RequestBody EmployeeCreateV2DTO request
     ) {
@@ -61,7 +61,7 @@ public class EmployeeControllerV2 {
      * Returns an employee profile for HR admins or the owning employee (with manager info).
      */
     @GetMapping("/{employeeId}")
-    @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_OR_SELF)
     public ResponseEntity<EmployeeDetailsV2DTO> getEmployeeByPathEmployeeId(
         @PathVariable String employeeId
     ) {
@@ -72,7 +72,7 @@ public class EmployeeControllerV2 {
      * Convenience endpoint to resolve the caller's own profile.
      */
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('EMPLOYEE','HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.EMPLOYEE_OR_HR_ADMIN)
     public ResponseEntity<EmployeeDetailsV2DTO> getMyEmployeeProfile(Authentication authentication) {
         Object principal = authentication.getPrincipal();
         String employeeId = null;
@@ -94,7 +94,7 @@ public class EmployeeControllerV2 {
      * Full update endpoint for HR admins (including manager assignment).
      */
     @PutMapping("/{employeeId}")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<EmployeeSummaryV2DTO> updateEmployee(
         @PathVariable String employeeId,
         @Valid @RequestBody EmployeeUpdateV2DTO request
@@ -108,7 +108,7 @@ public class EmployeeControllerV2 {
      * <p>If both parameters are supplied, {@code employeeId} takes precedence.</p>
      */
     @GetMapping("/search")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<Page<EmployeeSummaryV2DTO>> searchEmployees(
         @RequestParam(value = "employeeId", required = false) String employeeId,
         @RequestParam(value = "lastName", required = false) String lastName,
@@ -120,7 +120,7 @@ public class EmployeeControllerV2 {
     }
 
     @GetMapping(params = "employeeId")
-    @PreAuthorize("hasRole('HR_ADMIN')")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_ONLY)
     public ResponseEntity<EmployeeSummaryV2DTO> getByEmployeeId(
         @RequestParam("employeeId") @NotBlank String employeeId
     ) {
@@ -134,7 +134,7 @@ public class EmployeeControllerV2 {
      * <p>HR admins can view any employee's subordinates. Employees can view their own subordinates.</p>
      */
     @GetMapping("/{employeeId}/subordinates")
-    @PreAuthorize("hasRole('HR_ADMIN') or (hasRole('EMPLOYEE') and #employeeId == authentication.principal.employee_id)")
+    @PreAuthorize(EmployeeAuthorizationExpressions.HR_ADMIN_OR_SELF)
     public ResponseEntity<List<EmployeeSummaryV2DTO>> getSubordinates(
         @PathVariable String employeeId
     ) {
